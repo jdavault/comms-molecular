@@ -1,0 +1,16 @@
+{
+  "compilerOptions": {
+    "lib": ["ESNext.String", "DOM", "ES2021.String"],
+    "module": "commonjs",
+    "esModuleInterop": true,
+    "noImplicitAny": true,
+    "removeComments": true,
+    "preserveConstEnums": true,
+    "sourceMap": true,
+    "pretty": true,
+    "target": "es6",
+    "outDir": "dist"
+  },
+  "include": ["./**/*"],
+  "exclude": ["node_modules/**/*", "test"]
+}

@@ -1,0 +1,169 @@
+###
+# Kaniko documentation: https://github.com/GoogleContainerTools/kaniko
+#
+# As an example this is using the debug tag, you should really update this to a specific version you update and test regularly.
+# Available container image tags: https://console.cloud.google.com/gcr/images/kaniko-project/GLOBAL/executor (search for the debug tags)
+###
+---
+.kaniko-build-defaults:
+  image:
+    name: case.artifacts.medtronic.com/ext-gcrio-remote/kaniko-project/executor:debug
+    entrypoint: [""]
+  variables:
+    ARTIFACTORY_HOSTNAME: case.artifacts.medtronic.com
+    KANIKO_BUILD_DESTINATION: case.artifacts.medtronic.com/medicrea_comms-docker-stage-local/medicrea-comms-backend
+    KANIKO_BUILD_TAG: $CI_COMMIT_SHORT_SHA
+    KANIKO_VERBOSITY: info
+  before_script:
+    - |
+      if [[ ! -z "$ARTIFACTORY_USERNAME" && ! -z "$ARTIFACTORY_API_KEY" ]]; then
+        echo "{\"auths\":{\"$ARTIFACTORY_HOSTNAME\":{\"username\":\"$ARTIFACTORY_USERNAME\",\"password\":\"$ARTIFACTORY_API_KEY\"}}}" > /kaniko/.docker/config.json
+      else
+        echo "Missing Artifactory authentication variables" && exit 1
+      fi
+    - |
+      for i in $(env); do
+        if [ $(echo $i | grep -e "^KANIKO_BUILD_ARG_.*") ]; then
+          export KANIKO_BUILD_ARGS="--build-arg ${i##'KANIKO_BUILD_ARG_'} $KANIKO_BUILD_ARGS"
+        fi
+      done
+  script:
+    - echo "Building image with arguments [$KANIKO_BUILD_ARGS]"
+    - >-
+      /kaniko/executor --context=$CI_PROJECT_DIR --dockerfile=$CI_PROJECT_DIR/Dockerfile
+      --destination=$KANIKO_BUILD_DESTINATION:$KANIKO_BUILD_TAG
+      --verbosity=$KANIKO_VERBOSITY
+      $KANIKO_BUILD_ARGS
+
+.test-built-image:
+  script:
+    - echo "Placeholder for pre-deployment image testing"
+
+.aws-deploy-image:
+  image:
+    name: case.artifacts.medtronic.com/ext-docker-hub-remote/amazon/aws-cli
+    entrypoint: [""]
+  variables:
+    ARTIFACTORY_HOSTNAME: case.artifacts.medtronic.com
+    IMAGE_SOURCE_PATH: /medicrea_comms-docker-stage-local/medicrea-comms-backend
+    IMAGE_SOURCE_TAG: $CI_COMMIT_SHORT_SHA
+    CONTRAST_ENV: QA
+    SSO_APP_ID: $DEV_SSO_APP_ID
+    SSO_TENANT_ID: $DEV_SSO_TENANT_ID
+  before_script:
+    - |
+      if [[ ! -z "$ARTIFACTORY_USERNAME" && ! -z "$ARTIFACTORY_API_KEY" ]]; then
+        mkdir ~/.docker
+        echo "{\"auths\":{\"$ARTIFACTORY_HOSTNAME\":{\"username\":\"$ARTIFACTORY_USERNAME\",\"password\":\"$ARTIFACTORY_API_KEY\"}}}" > ~/.docker/config.json
+      else
+        echo "Missing Artifactory authentication variables" && exit 1
+      fi
+    - |
+      if [[ ! -z "$AWS_ACCESS_KEY_ID" && ! -z "$AWS_SECRET_ACCESS_KEY" ]]; then
+        echo "AWS Credentials Defined"
+      else
+        echo "AWS Credentials missing" && exit 1
+      fi
+  script:
+    - echo "Setting EKS configuration"
+    - aws eks update-kubeconfig --name medicrea-dev-cluster --region us-east-1 --role-arn arn:aws:iam::781342124630:role/medicrea-dev-cluster-EKSClusterAccessRole
+    - echo "Installing prerequisites"
+    - curl -L "https://dl.k8s.io/release/v1.21.0/bin/linux/amd64/kubectl" -o /usr/local/bin/kubectl
+    - chmod +x /usr/local/bin/kubectl
+    - /usr/local/bin/kubectl version
+    - curl -L https://github.com/a8m/envsubst/releases/download/v1.2.0/envsubst-`uname -s`-`uname -m` -o envsubst
+    - chmod +x envsubst
+    - mv envsubst /usr/local/bin
+    - for i in `grep secretName k8s-aws-secretmap.yml | awk '{print $2}'` ; do echo "Removing stale sync secret $i" ; kubectl delete secret "$i" ; done
+    - echo "Deploying secrets"
+    - kubectl apply -f k8s-aws-secretmap.yml
+    - echo "Deploying app with image $ARTIFACTORY_HOSTNAME$IMAGE_SOURCE_PATH:$IMAGE_SOURCE_TAG"
+    - envsubst < deployment-k8s.yaml | kubectl apply -f -
+
+.aws-deploy-prod-image:
+  image:
+    name: case.artifacts.medtronic.com/ext-docker-hub-remote/amazon/aws-cli
+    entrypoint: [""]
+  variables:
+    ARTIFACTORY_HOSTNAME: case.artifacts.medtronic.com
+    IMAGE_SOURCE_PATH: /medicrea_comms-docker-stage-local/medicrea-comms-backend
+    IMAGE_SOURCE_TAG: $CI_COMMIT_SHORT_SHA
+    AWS_ACCESS_KEY_ID: $PROD_AWS_ACCESS_KEY_ID
+    AWS_SECRET_ACCESS_KEY: $PROD_AWS_SECRET_ACCESS_KEY
+    CONTRAST_ENV: Production
+    SSO_APP_ID: $PROD_SSO_APP_ID
+    SSO_TENANT_ID: $PROD_SSO_TENANT_ID
+  before_script:
+    - |
+      if [[ ! -z "$ARTIFACTORY_USERNAME" && ! -z "$ARTIFACTORY_API_KEY" ]]; then
+        mkdir ~/.docker
+        echo "{\"auths\":{\"$ARTIFACTORY_HOSTNAME\":{\"username\":\"$ARTIFACTORY_USERNAME\",\"password\":\"$ARTIFACTORY_API_KEY\"}}}" > ~/.docker/config.json
+      else
+        echo "Missing Artifactory authentication variables" && exit 1
+      fi
+    - |
+      if [[ ! -z "$AWS_ACCESS_KEY_ID" && ! -z "$AWS_SECRET_ACCESS_KEY" ]]; then
+        echo "AWS Credentials Defined"
+      else
+        echo "AWS Credentials missing" && exit 1
+      fi
+  script:
+    - export AWS_ACCESS_KEY_ID=$PROD_AWS_ACCESS_KEY_ID
+    - export AWS_SECRET_ACCESS_KEY=$PROD_AWS_SECRET_ACCESS_KEY
+    - echo "Setting EKS configuration"
+    - aws sts get-caller-identity --query "Account" --output text
+    - aws eks update-kubeconfig --name medicrea-prod-cluster --region us-east-1 --role-arn arn:aws:iam::947565331864:role/medicrea-prod-cluster-EKSClusterAccessRole
+    - echo "Installing prerequisites"
+    - curl -L "https://dl.k8s.io/release/v1.21.0/bin/linux/amd64/kubectl" -o /usr/local/bin/kubectl
+    - chmod +x /usr/local/bin/kubectl
+    - /usr/local/bin/kubectl version
+    - curl -L https://github.com/a8m/envsubst/releases/download/v1.2.0/envsubst-`uname -s`-`uname -m` -o envsubst
+    - chmod +x envsubst
+    - mv envsubst /usr/local/bin
+    - echo "Deploying secrets"
+    - for i in `grep secretName k8s-prod-aws-secret-map.yml | awk '{print $2}'` ; do echo "Removing stale sync secret $i" ; kubectl delete secret "$i" ; done
+    - kubectl apply -f k8s-prod-aws-secret-map.yml
+    - echo "Deploying app with image $ARTIFACTORY_HOSTNAME$IMAGE_SOURCE_PATH:$IMAGE_SOURCE_TAG"
+    - envsubst < deployment-k8s.yaml | kubectl apply -f -
+
+stages:
+  - build
+  - test
+  - deploy-dev
+  - deploy-prod
+
+build-kaniko-image:
+  tags:
+    - medicrea-comms
+  extends:
+    - .kaniko-build-defaults
+  stage: build
+  only:
+    - main
+
+test-image:
+  tags:
+    - medicrea-comms
+  extends:
+    - .test-built-image
+  stage: test
+  only:
+    - main
+
+deploy-image:
+  tags:
+    - medicrea-comms
+  extends:
+    - .aws-deploy-image
+  stage: deploy-dev
+  only:
+    - main
+
+deploy-prod-image:
+  tags:
+    - prod
+  rules:
+    - when: manual
+  extends:
+    - .aws-deploy-prod-image
+  stage: deploy-prod

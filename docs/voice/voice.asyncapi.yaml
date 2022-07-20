@@ -1,0 +1,455 @@
+asyncapi: 2.0.0
+id: urn:com:medicrea:orchestrator:voice
+defaultContentType: application/json
+info:
+  title: "VoiceService"
+  version: 0.0.1
+  description: "Microservice which handles chat communications via Twilio Conversations API for the medicrea Orchestration platform."
+servers:
+  # TODO: Need to add/update for deployed microservice address/api
+  "Google Cloud Pub/Sub":
+    protocol: https
+    url: https://pubsub.googleapis.com
+channels:
+  medicrea.voice.completed:
+    publish:
+      message:
+        $ref: "#/components/messages/medicrea.voice.notification.v1"
+  medicrea.voice.queued:
+    publish:
+      message:
+        $ref: "#/components/messages/medicrea.voice.notification.v1"
+  medicrea.voice.initiated:
+    publish:
+      message:
+        $ref: "#/components/messages/medicrea.voice.initiation.v1"
+  medicrea.voice.ringing:
+    publish:
+      message:
+        $ref: "#/components/messages/medicrea.voice.initiation.v1"
+  medicrea.voice.inProgress:
+    publish:
+      message:
+        $ref: "#/components/messages/medicrea.voice.notification.v1"
+  medicrea.voice.Error:
+    publish:
+      message:
+        $ref: "#/components/messages/medicrea.voice.error.v1"
+  medicrea.voice.start_inbound_conference:
+    publish:
+      message:
+        $ref: "#/components/messages/medicrea.voice.initiation.v1"
+components:
+  schemas:
+    phoneNumber:
+      type: string
+      format: phone
+      pattern: ^\+[1-9]\d{1,14}$
+      examples:
+        - "+15558675309"
+        - "+18002738255"
+    accountSid:
+      type: string
+      description: Twilio identifier for the account that owns the phone number sending an API request.
+    callSid:
+      type: string
+      description: Twilio identifier for the call.
+    cloudevent:
+      id:
+        type: string
+        format: uuid
+        externalDocs:
+          description: CloudEvent 1.0.1 Specification
+          url: https://github.com/cloudevents/spec/blob/v1.0.1/spec.md#id
+        description: Identifies the event.
+      source:
+        type: string
+        format: URI-reference
+        externalDocs:
+          description: CloudEvent 1.0.1 Specification
+          url: https://github.com/cloudevents/spec/blob/v1.0.1/spec.md#source
+        examples:
+          - urn:com:medicrea:via:crm:backend
+        description: Identifies the context in which an event happened.
+      type_:
+        type: string
+        externalDocs:
+          description: CloudEvent 1.0.1 Specification
+          url: https://github.com/cloudevents/spec/blob/v1.0.1/spec.md#
+        description: Type of the message as set by the producer, typically aligns to the published message channel.
+      dataschema:
+        type: string
+        format: uri
+        externalDocs:
+          description: CloudEvent 1.0.1 Specification
+          url: https://github.com/cloudevents/spec/blob/v1.0.1/spec.md#dataschema
+        description: Identifies the schema that data adheres to.
+      subject:
+        type: string
+        externalDocs:
+          description: CloudEvent 1.0.1 Specification
+          url: https://github.com/cloudevents/spec/blob/v1.0.1/spec.md#subject
+        description: Describes the subject of the event in the context of the event producer (identified by source).
+      time:
+        type: string
+        format: date-time
+        externalDocs:
+          description: CloudEvent 1.0.1 Specification
+          url: https://github.com/cloudevents/spec/blob/v1.0.1/spec.md#time
+        description: Timestamp of when the occurrence happened. This should be set by the event producer before publishing.
+      datacontenttype:
+        type: string
+        externalDocs:
+          description: CloudEvent 1.0.1 Specification
+          url: https://github.com/cloudevents/spec/blob/v1.0.1/spec.md#datacontenttype
+        description: The content type of the data parameter.
+        examples:
+          - "application/json"
+      data:
+        type: string
+        format: json
+      specversion:
+        type: string
+        externalDocs:
+          description: CloudEvent 1.0.1 Specification
+          url: https://github.com/cloudevents/spec/blob/v1.0.1/spec.md#specversion
+        description: The version of the CloudEvents specification which the event uses.
+        examples:
+          - "1.0"
+          - "1.0.1"
+    medicrea.voice.initiation.v1.data:
+      type: object
+      required:
+        - accountSid
+        - apiVersion
+        - callSid
+        - callStatus
+        - called
+        - calledCountry
+        - calledCity
+        - calledState
+        - calledZip
+        - caller
+        - callerCity
+        - callerCountry
+        - callerState
+        - direction
+        - fromCity
+        - from
+        - fromState
+        - to
+        - fromZip
+        - fromCountry
+        - callerZip
+        - toCity
+        - toCountry
+        - toZip
+        - toState
+      properties:
+        accountSid:
+          $ref: "#/components/schemas/accountSid"
+        apiVersion:
+          type: string
+          description: The version of the Twilio API
+          example: "2016-04-10"
+        called:
+          $ref: "#/components/schemas/phoneNumber"
+          description: Phone number the call is address to.
+        calledCountry:
+          type: string
+          description: A short code representing what country the receiving number is registered in.
+        calledCity:
+          type: string
+          description: The name of the city the recieving number is registered in.
+        calledState:
+          minLength: 2
+          maxLength: 2
+          type: string
+          description: The two letter code for the state the recieving number is based in.
+        calledZip:
+          type: string
+          maxLength: 5
+          minLength: 5
+          description: The 5 digit zip code associated with the receiving number
+        caller:
+          $ref: "#/components/schemas/phoneNumber"
+          description: Phone number placing the call
+        callerCountry:
+          type: string
+          description: A short code representing what country the calling number is registered in.
+        callerCity:
+          type: string
+          description: The name of the city the calling number is registered in.
+        callerState:
+          type: string
+          minLength: 2
+          maxLength: 2
+          description: The two letter code for the state the calling number is based in.
+        direction:
+          type: string
+          description: Indicates whether this is an inbound or outbound call, relative to the Twilio number.
+        fromCity:
+          type: string
+          Describes: The name of the city the call is originating in.
+        from:
+          $ref: "#/components/schemas/phoneNumber"
+          description: Phone number placing the call
+        fromState:
+          minLength: 2
+          maxLength: 2
+          type: string
+          description: The state the call originated from.
+        to: 
+          $ref: "#/components/schemas/phoneNumber"
+          description: The phone number the call was placed to.
+        fromZip:
+          type: string
+          maxLength: 5
+          minLength: 5
+          description: The 5 digit zip code the call originated from.
+        fromCountry:
+          type: string
+          description: A short code identifying the calling number's country of origin.
+        callerZip:
+          type: string
+          maxLength: 5
+          minLength: 5
+          description: The 5 digit zip code the call originated from.
+        toCity:
+          type: string
+          description: The name of the city the receiving number is associated with.
+        toCountry:
+          type: string
+          description: A short code identifying the called number's associated country.
+        toZip:
+          type: string
+          maxLength: 5
+          minLength: 5
+          description: The 5 digit zip code the called number is associated with.
+        toState:
+          minLength: 2
+          maxLength: 2
+          type: string
+          description: The two digit code of the state receiving the call.
+        stirVerstat:
+          type: string
+          description: Part of the Twilio authentication process.
+        StirPassportToken:
+          type: string
+          description: Part of the Twilio authentication process.
+
+    medicrea.voice.notification.v1.data:
+      type: object
+      required:
+        - accountSid
+        - apiVersion
+        - callSid
+        - callStatus
+        - called
+        - calledCountry
+        - calledCity
+        - calledState
+        - calledZip
+        - caller
+        - callerCity
+        - callerCountry
+        - callerState
+        - direction
+        - fromCity
+        - from
+        - fromState
+        - to
+        - fromZip
+        - fromCountry
+        - callerZip
+        - toCity
+        - toCountry
+        - toZip
+        - toState
+      properties:
+        accountSid:
+          $ref: "#/components/schemas/accountSid"
+        apiVersion:
+          type: string
+          description: The version of the Twilio API
+          example: "2016-04-10"
+        called:
+          $ref: "#/components/schemas/phoneNumber"
+          description: Phone number the call is address to.
+        calledCountry:
+          type: string
+          description: A short code representing what country the receiving number is registered in.
+        calledCity:
+          type: string
+          description: The name of the city the recieving number is registered in.
+        calledState:
+          minLength: 2
+          maxLength: 2
+          type: string
+          description: The two letter code for the state the recieving number is based in.
+        calledZip:
+          type: string
+          maxLength: 5
+          minLength: 5
+          description: The 5 digit zip code associated with the receiving number
+        caller:
+          $ref: "#/components/schemas/phoneNumber"
+          description: Phone number placing the call
+        callerCountry:
+          type: string
+          description: A short code representing what country the calling number is registered in.
+        callerCity:
+          type: string
+          description: The name of the city the calling number is registered in.
+        callerState:
+          type: string
+          minLength: 2
+          maxLength: 2
+          description: The two letter code for the state the calling number is based in.
+        direction:
+          type: string
+          description: Indicates whether this is an inbound or outbound call, relative to the Twilio number.
+        fromCity:
+          type: string
+          Describes: The name of the city the call is originating in.
+        from:
+          $ref: "#/components/schemas/phoneNumber"
+          description: Phone number placing the call
+        fromState:
+          minLength: 2
+          maxLength: 2
+          type: string
+          description: The state the call originated from.
+        to: 
+          $ref: "#/components/schemas/phoneNumber"
+          description: The phone number the call was placed to.
+        fromZip:
+          type: string
+          maxLength: 5
+          minLength: 5
+          description: The 5 digit zip code the call originated from.
+        fromCountry:
+          type: string
+          description: A short code identifying the calling number's country of origin.
+        callerZip:
+          type: string
+          maxLength: 5
+          minLength: 5
+          description: The 5 digit zip code the call originated from.
+        toCity:
+          type: string
+          description: The name of the city the receiving number is associated with.
+        toCountry:
+          type: string
+          description: A short code identifying the called number's associated country.
+        toZip:
+          type: string
+          maxLength: 5
+          minLength: 5
+          description: The 5 digit zip code the called number is associated with
+        toState:
+          minLength: 2
+          maxLength: 2
+          type: string
+          description: The two digit code of the state receiving the call.
+    medicrea.voice.error.v1.data:
+      type: object
+      required:
+        - error
+      properties:
+        message:
+          type: string
+          description: Message describing the error that occurred. This can come from an exception message or HTTP response.
+          minLength: 1
+          maxLength: 10000
+  messages:
+    medicrea.voice.notification.v1:
+      summary: Message describing an update to Twilio voice activity.
+      tags:
+        - name: status
+      payload:
+        required:
+          - id
+          - type
+          - source
+          - specversion
+          - time
+        properties:
+          id:
+            $ref: "#/components/schemas/cloudevent/id"
+          source:
+            $ref: "#/components/schemas/cloudevent/source"
+          specversion:
+            const: "1.0.1"
+            $ref: "#/components/schemas/cloudevent/specversion"
+          type:
+            const: medicrea.chat.send.v1
+            $ref: "#/components/schemas/cloudevent/type_"
+          time:
+            $ref: "#/components/schemas/cloudevent/time"
+          datacontenttype:
+            $ref: "#/components/schemas/cloudevent/datacontenttype"
+          data:
+            $ref: "#/components/schemas/medicrea.voice.notification.v1.data"
+
+    medicrea.voice.initiation.v1:
+      summary: Message describing incoming call activity.
+      tags:
+        - name: event
+      payload:
+        required:
+          - id
+          - type
+          - source
+          - specversion
+          - time
+        properties:
+          id:
+            $ref: "#/components/schemas/cloudevent/id"
+          source:
+            $ref: "#/components/schemas/cloudevent/source"
+          specversion:
+            const: "1.0.1"
+            $ref: "#/components/schemas/cloudevent/specversion"
+          type:
+            const: medicrea.chat.send.v1
+            $ref: "#/components/schemas/cloudevent/type_"
+          time:
+            $ref: "#/components/schemas/cloudevent/time"
+          datacontenttype:
+            $ref: "#/components/schemas/cloudevent/datacontenttype"
+          data:
+            $ref: "#/components/schemas/medicrea.voice.initiation.v1.data"
+    medicrea.voice.error.v1:
+      summary: Message describing an error that occurred from the service.
+      tags:
+        - name: event
+      payload:
+        required:
+          - id
+          - type
+          - source
+          - specversion
+          - time
+        properties:
+          id:
+            $ref: "#/components/schemas/cloudevent/id"
+          source:
+            $ref: "#/components/schemas/cloudevent/source"
+          specversion:
+            const: "1.0.1"
+            $ref: "#/components/schemas/cloudevent/specversion"
+          type:
+            const: medicrea.voice.error.v1
+            $ref: "#/components/schemas/cloudevent/type_"
+          time:
+            $ref: "#/components/schemas/cloudevent/time"
+          datacontenttype:
+            $ref: "#/components/schemas/cloudevent/datacontenttype"
+          data:
+            $ref: "#/components/schemas/medicrea.voice.error.v1.data"
+tags:
+  - name: status
+    description: Messages that can be thought of as status updates to an invoked command
+  - name: event
+    description: Messages that can be thought of as a kind of domain event or occurrense which other services can react to.

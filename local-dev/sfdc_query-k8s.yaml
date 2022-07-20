@@ -1,0 +1,40 @@
+#########################################################
+# SFDC Query service
+#########################################################
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sfdc-query
+spec:
+  selector:
+    matchLabels:
+      app: sfdc-query
+  replicas: 2
+  template:
+    metadata:
+      labels:
+        app: sfdc-query
+    spec:
+      containers:
+        - name: sfdc-query
+          image: medicrea-comms-backend
+          envFrom:
+            - configMapRef:
+                name: common-env
+          env:
+            - name: SERVICES
+              value: sfdc-query
+      livenessProbe:
+        httpGet:
+          path: /live
+          port: 3001
+          initialDelaySeconds: 60
+          periodSeconds: 5
+      readinessProbe:
+        httpGet:
+          path: /ready
+          port: 3001
+          initialDelaySeconds: 60
+          periodSeconds: 5
+---
+

@@ -1,0 +1,228 @@
+openapi: "3.0.1"
+info:
+  version: "0.0.1"
+  title: "Medicrea-App Service API"
+servers:
+  - url: https://communidy.medtronic.com{basePath}
+    description: Production server URL (tentative)
+    variables:
+      basePath:
+        default: "/api/v1"
+  - url: https://dev.communidy.medtronic.com{basePath}
+    description: Non-production or staging server URL (tentative)
+    variables:
+      basePath:
+        default: "/api/v1"
+
+security:
+  - BearerAuth: []
+  - OAuth2:
+      - read
+      - write
+
+paths:
+  /medicrea-app/contacts:
+    get:
+      description: Returns all contacts and unidContacts from Salesforce
+      responses:
+        "200":
+          description: A list of contacts.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Contact"
+
+  /medicrea-app/twilio/token:
+    get:
+      description: Twilio Conversations token for chat
+      parameters:
+        - name: fedId
+          in: query
+          description: user id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          # content:
+
+  /medicrea-app/user:
+    get:
+      tags:
+        - user
+      description: User
+      parameters:
+        - name: fedId
+          in: query
+          description: user id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          # content:
+    put:
+      tags:
+        - user
+      parameters:
+        - name: id
+          in: query
+          description: user id
+          required: true
+          schema:
+            type: string
+        - name: status
+          in: query
+          description: user id
+          required: true
+          schema:
+            type: string
+        - name: userForwardId
+          in: query
+          description: forward user salesforce id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          # content:
+
+  /medicrea-app/sfUser:
+    get:
+      tags:
+        - user
+      description: User
+      parameters:
+        - name: sfId
+          in: query
+          description: user id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          # content:
+
+  /medicrea-app/users:
+    get:
+      tags:
+        - user
+      description: Users
+      responses:
+        "200":
+          description: OK
+          # content:
+
+  /medicrea-app/initial/message:
+    post:
+      description: Users
+      summary: Updates a pet in the store with form data
+      operationId: updatePetWithForm
+      parameters:
+        - name: contactPerson
+          in: query
+          # description:
+          required: true
+          schema:
+            type: object
+        - name: friendlyName
+          in: query
+          # description:
+          required: true
+          schema:
+            type: string
+        - name: assignedTwilioNumber
+          in: query
+          # description:
+          required: true
+          schema:
+            type: string
+        - name: subject
+          in: query
+          # description:
+          required: true
+          schema:
+            type: string
+        - name: initialMessage
+          in: query
+          # description:
+          required: true
+          schema:
+            type: string
+        - name: userFedId
+          in: query
+          # description:
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          # content:
+
+  /medicrea-app/message/subjects:
+    get:
+      description: Users
+      responses:
+        "200":
+          description: OK
+          # content:
+
+components:
+  schemas:
+    Contact:
+      type: object
+      required:
+        - attributes
+        - Id
+        - Name
+        - Phone
+        - Email
+        - AltEmail
+      properties:
+        attributes:
+          type: object
+        Id:
+          type: string
+          example: "0030R00001XX7vXXXX"
+        Name:
+          type: string
+          example: "Mock User"
+        Phone:
+          type: string
+          example: "5555555555"
+        MobilePhone:
+          type: string
+          example: "5555555555"
+        Email:
+          type: string
+          example: "mockuser@mail.com"
+        AltEmail:
+          type: string
+          example: "mockuser@altmail.com"
+        Location:
+          type: string
+          example: "Regional West Medical Center"
+        Type:
+          type: string
+          example: "Sales Rep"
+
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+    OAuth2:
+      type: oauth2
+      flows:
+        authorizationCode:
+          authorizationUrl: https://login.microsoftonline.com/common/oauth2/v2.0/authorize
+          tokenUrl: https://login.microsoftonline.com/common/oauth2/v2.0/token
+          scopes:
+            read: Grants read access
+            write: Grants write access

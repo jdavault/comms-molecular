@@ -1,0 +1,40 @@
+#########################################################
+# Medicrea App service
+#########################################################
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: medicrea-app
+spec:
+  selector:
+    matchLabels:
+      app: medicrea-app
+  replicas: 2
+  template:
+    metadata:
+      labels:
+        app: medicrea-app
+    spec:
+      containers:
+        - name: medicrea-app
+          image: medicrea-comms-backend
+          envFrom:
+            - configMapRef:
+                name: common-env
+          env:
+            - name: SERVICES
+              value: medicrea-app
+      livenessProbe:
+        httpGet:
+          path: /live
+          port: 3001
+          initialDelaySeconds: 60
+          periodSeconds: 5
+      readinessProbe:
+        httpGet:
+          path: /ready
+          port: 3001
+          initialDelaySeconds: 60
+          periodSeconds: 5
+---
+

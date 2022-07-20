@@ -1,0 +1,40 @@
+#########################################################
+# SFDC Users service
+#########################################################
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sfdc-users
+spec:
+  selector:
+    matchLabels:
+      app: sfdc-users
+  replicas: 2
+  template:
+    metadata:
+      labels:
+        app: sfdc-users
+    spec:
+      containers:
+        - name: sfdc-users
+          image: medicrea-comms-backend
+          envFrom:
+            - configMapRef:
+                name: common-env
+          env:
+            - name: SERVICES
+              value: sfdc-users
+      livenessProbe:
+        httpGet:
+          path: /live
+          port: 3001
+          initialDelaySeconds: 60
+          periodSeconds: 5
+      readinessProbe:
+        httpGet:
+          path: /ready
+          port: 3001
+          initialDelaySeconds: 60
+          periodSeconds: 5
+---
+

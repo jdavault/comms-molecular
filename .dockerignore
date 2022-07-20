@@ -1,0 +1,10 @@
+docker-compose.env
+docker-compose.yml
+deployment-k8s.yml
+k8s.yaml
+k8s-aws-secretmap.yml
+Dockerfile
+node_modules
+test
+.vscode
+.gitlab-ci.yml

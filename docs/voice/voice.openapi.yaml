@@ -1,0 +1,128 @@
+openapi: "3.0.1"
+info:
+  version: "0.0.1"
+  title: "Medicrea Voice Service API"
+servers:
+  - url: communidy.medtronic.com
+    description: Production server URL (tentative)
+    variables:
+      basePath:
+        default: "/api/v1"
+  - url: dev.communidy.medtronic.com
+    description: Non-production or staging server URL (tentative)
+    variables:
+      basePath:
+        default: "/api/v1"
+paths:
+  /voice/inbound:
+    post:
+      tags:
+        - voice
+      summary: "Webhook endpoint for Twilio calls to be routed to."
+      responses:
+        "200":
+          description: "successful operation"
+      requestBody:
+        description: Payload for Twilio Voice inbound events
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TwilioVoiceRequest"
+
+  /voice/status:
+    post:
+      summary: "Webhook endpoint for Twilio call status updates to be routed to."
+      responses:
+        "200":
+          description: "successful operation"
+      requestBody:
+        description: Payload for Twilio Voice status updates
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TwilioVoiceRequest"
+
+components:
+  schemas:
+    TwilioVoiceRequest:
+      type: object
+      externalDocs:
+        url: "https://www.twilio.com/docs/messaging/guides/webhook-request#parameters-in-twilios-request-to-your-application"
+      properties:
+        AccountSid:
+          type: string
+          example: "AC12345678"
+        ApiVersion:
+          type: string
+          example: "2010.04.01"
+        CallSid:
+          type: string
+          example: "CA12345678"
+        CallStatus:
+          type: string
+          example: "ringing"
+        Called:
+          type: string
+          example: "8005551234"
+        CalledCountry:
+          type: string
+          example: "US"
+        CalledCity:
+          type: string
+          example: "RICHMOND"
+        CalledState:
+          type: string
+          example: "VA"
+        CalledZip:
+          type: string
+          example: "23221"
+        Caller:
+          type: string
+          example: "8005554321"
+        CallerCity:
+          type: string
+          example: "RALEIGH"
+        CallerCountry:
+          type: string
+          example: "US"
+        CallerState:
+          type: string
+          example: "NC"
+        Direction:
+          type: string
+          example: "inbound"
+        FromCity:
+          type: string
+          example: "RALEIGH"
+        From:
+          type: string
+          example: "8005554321"
+        FromState:
+          type: string
+          example: "NC"
+        To:
+          type: string
+          example: "8005551234"
+        FromZip:
+          type: string
+          example: "52761"
+        FromCountry:
+          type: string
+          example: "US"
+        CallerZip:
+          type: string
+          example: "52761"
+        ToCity:
+          type: string
+          example: "RICHMOND"
+        ToCountry:
+          type: string
+          example: "US"
+        ToZip:
+          type: string
+          example: "23221"
+        ToState:
+          type: string
+          example: "VA"

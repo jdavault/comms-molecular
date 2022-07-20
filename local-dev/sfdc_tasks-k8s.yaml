@@ -1,0 +1,40 @@
+#########################################################
+# SFDC Tasks service
+#########################################################
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sfdc-tasks
+spec:
+  selector:
+    matchLabels:
+      app: sfdc-tasks
+  replicas: 2
+  template:
+    metadata:
+      labels:
+        app: sfdc-tasks
+    spec:
+      containers:
+        - name: sfdc-tasks
+          image: medicrea-comms-backend
+          envFrom:
+            - configMapRef:
+                name: common-env
+          env:
+            - name: SERVICES
+              value: sfdc-tasks
+      livenessProbe:
+        httpGet:
+          path: /live
+          port: 3001
+          initialDelaySeconds: 60
+          periodSeconds: 5
+      readinessProbe:
+        httpGet:
+          path: /ready
+          port: 3001
+          initialDelaySeconds: 60
+          periodSeconds: 5
+---
+

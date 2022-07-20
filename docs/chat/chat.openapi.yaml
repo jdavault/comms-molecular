@@ -1,0 +1,219 @@
+openapi: "3.0.1"
+info:
+  version: "0.0.1"
+  title: "Medicrea Chat Service API"
+servers:
+  - url: https://communidy.medtronic.com{basePath}
+    description: Production server URL (tentative)
+    variables:
+      basePath:
+        default: "/api/v1"
+  - url: https://dev.communidy.medtronic.com{basePath}
+    description: Non-production or staging server URL (tentative)
+    variables:
+      basePath:
+        default: "/api/v1"
+
+paths:
+  /chat/inbound:
+    post:
+      tags:
+        - chat
+      summary: "Webhook endpoint for inbound Twilio SMS to be routed."
+      responses:
+        "200":
+          description: "successful operation"
+      requestBody:
+        description: Payload for Twilio SMS Inbound events
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TwilioInboundSMSRequest"
+
+  /chat/status:
+    post:
+      tags:
+        - chat
+      summary: "Webhook endpoint for Twilio SMS status updates."
+      responses:
+        "200":
+          description: "successful operation"
+      requestBody:
+        description: Payload for Twilio SMS status updates
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TwilioSMSStatusRequest"
+
+  /chat/conversations:
+    post:
+      tags:
+        - chat
+      summary: "Webhook endpoint for Twilio Conversations"
+      responses:
+        "200":
+          description: "Conversation Sid"
+          content:
+            text/plain:
+              schema:
+                type: "string"
+      requestBody:
+        description: Payload for Twilio Conversations Webhook
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TwilioConversationsWebhook"
+  /chat/initialMessage:
+    post:
+      tags:
+        - chat
+      summary: "Webhook endpoint to create initial conversation from mobile app"
+      responses:
+        "200":
+          description: "Conversation Sid"
+          content:
+            text/plain:
+              schema:
+                type: "string"
+      requestBody:
+        description: Payload for Twilio Conversations Webhook
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TwilioConversationsWebhook"
+
+components:
+  schemas:
+    TwilioInboundSMSRequest:
+      type: object
+      properties:
+        type:
+          type: string
+          example: "lab-team"
+        ToCountry:
+          type: string
+          example: type"US"
+        ToState:
+          type: string
+          example: "IA"
+        SmsMessageSid:
+          type: string
+          example: "SM47383ab41756f543466b61dd0553dbfb"
+        NumMedia:
+          type: string
+          example: "0"
+        ToCity:
+          type: string
+          example: "MUSCATINE"
+        FromZip:
+          type: string
+          example: "78232"
+        SmsSid:
+          type: string
+          example: "SM47383ab41756f543466b61dd0553dbfb"
+        FromState:
+          type: string
+          example: "TX"
+        SmsStatus:
+          type: string
+          example: "received"
+        FromCity:
+          type: string
+          example: "SAN ANTONIO"
+        Body:
+          type: string
+          example: "Test"
+        FromCountry:
+          type: string
+          example: "US"
+        To:
+          type: string
+          example: "+15636075966"
+        MessagingServiceSid:
+          type: string
+          example: "MG344318249d1144b4dbad9effa4904abe"
+        ToZip:
+          type: string
+          example: "52761"
+        NumSegments:
+          type: string
+          example: "1"
+        MessageSid:
+          type: string
+          example: "SM47383ab41756f543466b61dd0553dbfb"
+        AccountSid:
+          type: string
+          example: "AC11947859c8448f9015066e4d6d9858bf"
+        From:
+          type: string
+          example: "+12102867939"
+        ApiVersion:
+          type: string
+          example: "2010-04-01"
+    TwilioSMSStatusRequest:
+      type: object
+      properties:
+        SmsSid:
+          type: string
+          example: SM2xxxxxx
+        SmsStatus:
+          type: string
+          example: sent
+        MessageStatus:
+          type: string
+          example: sent
+        To:
+          type: string
+          example: +1512zzzyyyy
+        MessageSid:
+          type: string
+          example: SM2xxxxxx
+        AccountSid:
+          type: string
+          example: ACxxxxxxx
+        From:
+          type: string
+          example: +1512xxxyyyy
+        ApiVersion:
+          type: string
+          example: 2010-04-01
+    TwilioConversationsWebhook:
+      type: object
+      properties:
+        MessagingServiceSid:
+          type: string
+          example: MG344318249d1144b4dbadxxxxxxx
+        RetryCount:
+          type: string
+        EventType:
+          type: string
+          example: onConversationAdded
+        FriendlyName:
+          type: string
+          example: test
+        State:
+          type: string
+          example: active
+        Attributes:
+          type: string
+          example:
+            {
+              "contactNum": "+19196148343",
+              "assignedTwilioNumber": "+10000000000",
+            }
+        DateCreated:
+          type: string
+          example: 2021-11-04T18:22:32.197Z
+        ChatServiceSid:
+          type: string
+          example: IS0e046252933a4f7a8a7dfe8bbb33dxxx
+        AccountSid:
+          type: string
+        Source:
+          type: string
+        ConversationSid:
+          type: string

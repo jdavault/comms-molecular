@@ -1,0 +1,18 @@
+api:
+#set by env vars in deployment
+agent:
+  logger:
+    stdout: true
+  node:
+    app_root: /app
+application:
+  name: Medicrea_CommUNIDy
+  group: Medicrea_CommUNIDy
+  path: /app
+server:
+#  name: MSPMXWEBD335
+# Valid environment variables are: Development, QA, Production
+  environment: QA
+  path: /app
+#protect:
+#  enable: true

@@ -1,0 +1,40 @@
+#########################################################
+# Chat service
+#########################################################
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: chat
+spec:
+  selector:
+    matchLabels:
+      app: chat
+  replicas: 2
+  template:
+    metadata:
+      labels:
+        app: chat
+    spec:
+      containers:
+        - name: chat
+          image: medicrea-comms-backend
+          envFrom:
+            - configMapRef:
+                name: common-env
+          env:
+            - name: SERVICES
+              value: chat
+      livenessProbe:
+        httpGet:
+          path: /live
+          port: 3001
+          initialDelaySeconds: 60
+          periodSeconds: 5
+      readinessProbe:
+        httpGet:
+          path: /ready
+          port: 3001
+          initialDelaySeconds: 60
+          periodSeconds: 5
+---
+

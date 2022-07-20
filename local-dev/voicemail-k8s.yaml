@@ -1,0 +1,28 @@
+#########################################################
+# Voicemail service
+#########################################################
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: voicemail
+spec:
+  selector:
+    matchLabels:
+      app: voicemail
+  replicas: 2
+  template:
+    metadata:
+      labels:
+        app: voicemail
+    spec:
+      containers:
+        - name: voicemail
+          image: medicrea-comms-backend
+          envFrom:
+            - configMapRef:
+                name: common-env
+          env:
+            - name: SERVICES
+              value: voicemail
+---
+

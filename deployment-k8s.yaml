@@ -1,0 +1,2407 @@
+#########################################################
+# Common Environment variables ConfigMap
+#########################################################
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: common-env
+data:
+  NAMESPACE: ""
+  LOGLEVEL: trace
+  SERVICEDIR: dist/services
+  TRANSPORTER: nats://nats:4222
+  CACHER: redis://redis:6379
+  TWILIO_DESKTOP_APPLICATION_SID: AP97970a644e52d8d08667324ee39db6f7
+  CONTRAST__AGENT__LOGGER__LEVEL: TRACE
+  CONTRAST__AGENT__LOGGER__PATH: /dev/stdout
+
+---
+#########################################################
+# Service for Moleculer API Gateway service
+#########################################################
+apiVersion: v1
+kind: Service
+metadata:
+  name: api
+spec:
+  type: NodePort
+  selector:
+    app: api
+  ports:
+    - port: 3000
+      targetPort: 3000
+
+---
+#########################################################
+# API Gateway service
+#########################################################
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api
+spec:
+  selector:
+    matchLabels:
+      app: api
+  replicas: 2
+  template:
+    metadata:
+      labels:
+        app: api
+      annotations:
+        metrics.dynatrace.com/scrape: 'true'
+        metrics.dynatrace.com/path: '/metrics'
+        metrics.dynatrace.com/port: '3030'
+        metrics.dynatrace.com/secure: 'false'
+    spec:
+      serviceAccountName: medicrea-comms-secrets-sa
+      containers:
+        - name: api
+          image: $ARTIFACTORY_HOSTNAME$IMAGE_SOURCE_PATH:$IMAGE_SOURCE_TAG
+          envFrom:
+            - configMapRef:
+                name: common-env
+          env:
+            - name: SERVICES
+              value: api
+            - name: SSO_APP_ID
+              value: $SSO_APP_ID
+            - name: SSO_TENANT_ID
+              value: $SSO_TENANT_ID
+            - name: CONTRAST__SERVER__NAME
+              value: api-$CONTRAST_ENV
+            - name: CONTRAST__SERVER__ENVIRONMENT
+              value: $CONTRAST_ENV
+            - name: PORT
+              value: "3000"
+            - name: APP_URL
+              valueFrom:
+                secretKeyRef:
+                  name: app-env
+                  key: APP_URL
+            - name: TWILIO_LAB_MANAGER
+              valueFrom:
+                secretKeyRef:
+                  name: twilio-env
+                  key: TWILIO_LAB_MANAGER
+            - name: TWILIO_LAB_TEAM_NUMBER
+              valueFrom:
+                secretKeyRef:
+                  name: twilio-env
+                  key: TWILIO_LAB_TEAM_NUMBER
+            - name: TWILIO_ACCOUNT_SID
+              valueFrom:
+                secretKeyRef:
+                  name: twilio-env
+                  key: TWILIO_ACCOUNT_SID
+            - name: TWILIO_AUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: twilio-env
+                  key: TWILIO_AUTH_TOKEN
+            - name: TWILIO_API_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: twilio-env
+                  key: TWILIO_API_SECRET
+            - name: TWILIO_API_KEY_SID
+              valueFrom:
+                secretKeyRef:
+                  name: twilio-env
+                  key: TWILIO_API_KEY_SID
+            - name: TWILIO_CONVERSATIONS_SERVICE_SID
+              valueFrom:
+                secretKeyRef:
+                  name: twilio-env
+                  key: TWILIO_CONVERSATIONS_SERVICE_SID
+            - name: TWILIO_NOTIFY_SERVICE_SID
+              valueFrom:
+                secretKeyRef:
+                  name: twilio-env
+                  key: TWILIO_NOTIFY_SERVICE_SID
+            - name: TWILIO_PUSH_CREDENTIAL_SID
+              valueFrom:
+                secretKeyRef:
+                  name: twilio-env
+                  key: TWILIO_PUSH_CREDENTIAL_SID
+            - name: SF_LOGIN_URL
+              valueFrom:
+                secretKeyRef:
+                  name: salesforce-env
+                  key: SF_LOGIN_URL
+            - name: CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: salesforce-env
+                  key: CLIENT_ID
+            - name: SF_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: salesforce-env
+                  key: SF_USERNAME
+            - name: SF_CUSTOM_NOTIFICATION_ID
+              valueFrom:
+                secretKeyRef:
+                  name: salesforce-env
+                  key: SF_CUSTOM_NOTIFICATION_ID
+            - name: SF_WEBHOOK_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: salesforce-env
+                  key: SF_WEBHOOK_API_KEY
+            - name: CONTRAST__API__URL
+              valueFrom:
+                secretKeyRef:
+                  name: contrast-env
+                  key: CONTRAST_API_URL
+            - name: CONTRAST__API__API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: contrast-env
+                  key: CONTRAST_API_API_KEY
+            - name: CONTRAST__API__SERVICE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: contrast-env
+                  key: CONTRAST_API_SERVICE_KEY
+            - name: CONTRAST__API__USER_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: contrast-env
+                  key: CONTRAST_API_USER_NAME
+          ports:
+            - containerPort: 3000
+              name: "app-api"
+            - containerPort: 3001
+              name: "health"
+            - containerPort: 3030
+              name: "metrics"
+          volumeMounts:
+            - name: salesforce-key
+              mountPath: "/run/secrets/salesforce"
+              readOnly: true
+            - name: azure-jwks-public-json
+              mountPath: "/run/secrets/azure"
+              readOnly: true
+            - name: ssl-cert
+              mountPath: "/run/secrets/cert"
+              readOnly: true
+            - name: ssl-cert-key
+              mountPath: "/run/secrets/certkey"
+              readOnly: true
+            - name: app-env
+              mountPath: "/run/secrets/app-env"
+              readOnly: true
+            - name: twilio-env
+              mountPath: "/run/secrets/twilio-env"
+              readOnly: true
+            - name: salesforce-env
+              mountPath: "/run/secrets/salesforce-env"
+              readOnly: true
+            - name: contrast-env
+              mountPath: "/run/secrets/contrast-env"
+              readOnly: true
+      volumes:
+        - name: salesforce-key
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: "comms-moleculer-aws-secrets"
+        - name: azure-jwks-public-json
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: "comms-moleculer-aws-secrets"
+        - name: app-env
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: "comms-moleculer-aws-secrets"
+        - name: twilio-env
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: "comms-moleculer-aws-secrets"
+        - name: salesforce-env
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: "comms-moleculer-aws-secrets"
+        - name: contrast-env
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: "comms-moleculer-aws-secrets"
+        - name: ssl-cert
+          secret:
+            secretName: ssl-cert
+        - name: ssl-cert-key
+          secret:
+            secretName: ssl-cert-key
+
+---
+#########################################################
+# Voice service
+#########################################################
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: voice
+spec:
+  selector:
+    matchLabels:
+      app: voice
+  replicas: 2
+  template:
+    metadata:
+      labels:
+        app: voice
+      annotations:
+        metrics.dynatrace.com/scrape: 'true'
+        metrics.dynatrace.com/path: '/metrics'
+        metrics.dynatrace.com/port: '3030'
+        metrics.dynatrace.com/secure: 'false'
+    spec:
+      serviceAccountName: medicrea-comms-secrets-sa
+      containers:
+        - name: voice
+          image: $ARTIFACTORY_HOSTNAME$IMAGE_SOURCE_PATH:$IMAGE_SOURCE_TAG
+          envFrom:
+            - configMapRef:
+                name: common-env
+          env:
+            - name: SERVICES
+              value: voice
+            - name: CONTRAST__SERVER__NAME
+              value: voice-$CONTRAST_ENV
+            - name: CONTRAST__SERVER__ENVIRONMENT
+              value: $CONTRAST_ENV
+            - name: APP_URL
+              valueFrom:
+                secretKeyRef:
+                  name: app-env
+                  key: APP_URL
+            - name: TWILIO_LAB_MANAGER
+              valueFrom:
+                secretKeyRef:
+                  name: twilio-env
+                  key: TWILIO_LAB_MANAGER
+            - name: TWILIO_LAB_TEAM_NUMBER
+              valueFrom:
+                secretKeyRef:
+                  name: twilio-env
+                  key: TWILIO_LAB_TEAM_NUMBER
+            - name: TWILIO_ACCOUNT_SID
+              valueFrom:
+                secretKeyRef:
+                  name: twilio-env
+                  key: TWILIO_ACCOUNT_SID
+            - name: TWILIO_AUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: twilio-env
+                  key: TWILIO_AUTH_TOKEN
+            - name: TWILIO_API_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: twilio-env
+                  key: TWILIO_API_SECRET
+            - name: TWILIO_API_KEY_SID
+              valueFrom:
+                secretKeyRef:
+                  name: twilio-env
+                  key: TWILIO_API_KEY_SID
+            - name: TWILIO_CONVERSATIONS_SERVICE_SID
+              valueFrom:
+                secretKeyRef:
+                  name: twilio-env
+                  key: TWILIO_CONVERSATIONS_SERVICE_SID
+            - name: TWILIO_NOTIFY_SERVICE_SID
+              valueFrom:
+                secretKeyRef:
+                  name: twilio-env
+                  key: TWILIO_NOTIFY_SERVICE_SID
+            - name: TWILIO_PUSH_CREDENTIAL_SID
+              valueFrom:
+                secretKeyRef:
+                  name: twilio-env
+                  key: TWILIO_PUSH_CREDENTIAL_SID
+            - name: SF_LOGIN_URL
+              valueFrom:
+                secretKeyRef:
+                  name: salesforce-env
+                  key: SF_LOGIN_URL
+            - name: CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: salesforce-env
+                  key: CLIENT_ID
+            - name: SF_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: salesforce-env
+                  key: SF_USERNAME
+            - name: SF_CUSTOM_NOTIFICATION_ID
+              valueFrom:
+                secretKeyRef:
+                  name: salesforce-env
+                  key: SF_CUSTOM_NOTIFICATION_ID
+            - name: SF_WEBHOOK_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: salesforce-env
+                  key: SF_WEBHOOK_API_KEY
+            - name: CONTRAST__API__URL
+              valueFrom:
+                secretKeyRef:
+                  name: contrast-env
+                  key: CONTRAST_API_URL
+            - name: CONTRAST__API__API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: contrast-env
+                  key: CONTRAST_API_API_KEY
+            - name: CONTRAST__API__SERVICE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: contrast-env
+                  key: CONTRAST_API_SERVICE_KEY
+            - name: CONTRAST__API__USER_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: contrast-env
+                  key: CONTRAST_API_USER_NAME
+          ports:
+            - containerPort: 3030
+              name: "metrics"          
+          volumeMounts:
+            - name: salesforce-key
+              mountPath: "/run/secrets/salesforce"
+              readOnly: true
+            - name: azure-jwks-public-json
+              mountPath: "/run/secrets/azure"
+              readOnly: true
+            - name: ssl-cert
+              mountPath: "/run/secrets/cert"
+              readOnly: true
+            - name: ssl-cert-key
+              mountPath: "/run/secrets/certkey"
+              readOnly: true
+            - name: app-env
+              mountPath: "/run/secrets/app-env"
+              readOnly: true
+            - name: twilio-env
+              mountPath: "/run/secrets/twilio-env"
+              readOnly: true
+            - name: salesforce-env
+              mountPath: "/run/secrets/salesforce-env"
+              readOnly: true
+            - name: contrast-env
+              mountPath: "/run/secrets/contrast-env"
+              readOnly: true
+      volumes:
+        - name: salesforce-key
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: "comms-moleculer-aws-secrets"
+        - name: azure-jwks-public-json
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: "comms-moleculer-aws-secrets"
+        - name: app-env
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: "comms-moleculer-aws-secrets"
+        - name: twilio-env
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: "comms-moleculer-aws-secrets"
+        - name: salesforce-env
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: "comms-moleculer-aws-secrets"
+        - name: contrast-env
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: "comms-moleculer-aws-secrets"
+        - name: ssl-cert
+          secret:
+            secretName: ssl-cert
+        - name: ssl-cert-key
+          secret:
+            secretName: ssl-cert-key
+---
+#########################################################
+# Chat service
+#########################################################
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: chat
+spec:
+  selector:
+    matchLabels:
+      app: chat
+  replicas: 2
+  template:
+    metadata:
+      labels:
+        app: chat
+      annotations:
+        metrics.dynatrace.com/scrape: 'true'
+        metrics.dynatrace.com/path: '/metrics'
+        metrics.dynatrace.com/port: '3030'
+        metrics.dynatrace.com/secure: 'false'
+    spec:
+      serviceAccountName: medicrea-comms-secrets-sa
+      containers:
+        - name: chat
+          image: $ARTIFACTORY_HOSTNAME$IMAGE_SOURCE_PATH:$IMAGE_SOURCE_TAG
+          envFrom:
+            - configMapRef:
+                name: common-env
+          env:
+            - name: SERVICES
+              value: chat
+            - name: CONTRAST__SERVER__NAME
+              value: chat-$CONTRAST_ENV
+            - name: CONTRAST__SERVER__ENVIRONMENT
+              value: $CONTRAST_ENV
+            - name: APP_URL
+              valueFrom:
+                secretKeyRef:
+                  name: app-env
+                  key: APP_URL
+            - name: TWILIO_LAB_MANAGER
+              valueFrom:
+                secretKeyRef:
+                  name: twilio-env
+                  key: TWILIO_LAB_MANAGER
+            - name: TWILIO_LAB_TEAM_NUMBER
+              valueFrom:
+                secretKeyRef:
+                  name: twilio-env
+                  key: TWILIO_LAB_TEAM_NUMBER
+            - name: TWILIO_ACCOUNT_SID
+              valueFrom:
+                secretKeyRef:
+                  name: twilio-env
+                  key: TWILIO_ACCOUNT_SID
+            - name: TWILIO_AUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: twilio-env
+                  key: TWILIO_AUTH_TOKEN
+            - name: TWILIO_API_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: twilio-env
+                  key: TWILIO_API_SECRET
+            - name: TWILIO_API_KEY_SID
+              valueFrom:
+                secretKeyRef:
+                  name: twilio-env
+                  key: TWILIO_API_KEY_SID
+            - name: TWILIO_CONVERSATIONS_SERVICE_SID
+              valueFrom:
+                secretKeyRef:
+                  name: twilio-env
+                  key: TWILIO_CONVERSATIONS_SERVICE_SID
+            - name: TWILIO_NOTIFY_SERVICE_SID
+              valueFrom:
+                secretKeyRef:
+                  name: twilio-env
+                  key: TWILIO_NOTIFY_SERVICE_SID
+            - name: TWILIO_PUSH_CREDENTIAL_SID
+              valueFrom:
+                secretKeyRef:
+                  name: twilio-env
+                  key: TWILIO_PUSH_CREDENTIAL_SID
+            - name: SF_LOGIN_URL
+              valueFrom:
+                secretKeyRef:
+                  name: salesforce-env
+                  key: SF_LOGIN_URL
+            - name: CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: salesforce-env
+                  key: CLIENT_ID
+            - name: SF_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: salesforce-env
+                  key: SF_USERNAME
+            - name: SF_CUSTOM_NOTIFICATION_ID
+              valueFrom:
+                secretKeyRef:
+                  name: salesforce-env
+                  key: SF_CUSTOM_NOTIFICATION_ID
+            - name: SF_WEBHOOK_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: salesforce-env
+                  key: SF_WEBHOOK_API_KEY
+            - name: CONTRAST__API__URL
+              valueFrom:
+                secretKeyRef:
+                  name: contrast-env
+                  key: CONTRAST_API_URL
+            - name: CONTRAST__API__API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: contrast-env
+                  key: CONTRAST_API_API_KEY
+            - name: CONTRAST__API__SERVICE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: contrast-env
+                  key: CONTRAST_API_SERVICE_KEY
+            - name: CONTRAST__API__USER_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: contrast-env
+                  key: CONTRAST_API_USER_NAME
+          ports:
+            - containerPort: 3030
+              name: "metrics"  
+          volumeMounts:
+            - name: salesforce-key
+              mountPath: "/run/secrets/salesforce"
+              readOnly: true
+            - name: azure-jwks-public-json
+              mountPath: "/run/secrets/azure"
+              readOnly: true
+            - name: ssl-cert
+              mountPath: "/run/secrets/cert"
+              readOnly: true
+            - name: ssl-cert-key
+              mountPath: "/run/secrets/certkey"
+              readOnly: true
+            - name: app-env
+              mountPath: "/run/secrets/app-env"
+              readOnly: true
+            - name: twilio-env
+              mountPath: "/run/secrets/twilio-env"
+              readOnly: true
+            - name: salesforce-env
+              mountPath: "/run/secrets/salesforce-env"
+              readOnly: true
+            - name: contrast-env
+              mountPath: "/run/secrets/contrast-env"
+              readOnly: true
+          livenessProbe:
+            httpGet:
+              path: /live
+              port: 3001
+            initialDelaySeconds: 60
+            periodSeconds: 5
+            timeoutSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 3001
+            initialDelaySeconds: 60
+            periodSeconds: 5
+            timeoutSeconds: 10
+      volumes:
+        - name: salesforce-key
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: "comms-moleculer-aws-secrets"
+        - name: azure-jwks-public-json
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: "comms-moleculer-aws-secrets"
+        - name: app-env
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: "comms-moleculer-aws-secrets"
+        - name: twilio-env
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: "comms-moleculer-aws-secrets"
+        - name: salesforce-env
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: "comms-moleculer-aws-secrets"
+        - name: contrast-env
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: "comms-moleculer-aws-secrets"
+        - name: ssl-cert
+          secret:
+            secretName: ssl-cert
+        - name: ssl-cert-key
+          secret:
+            secretName: ssl-cert-key
+
+---
+#########################################################
+# Medicrea App service
+#########################################################
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: medicrea-app
+spec:
+  selector:
+    matchLabels:
+      app: medicrea-app
+  replicas: 2
+  template:
+    metadata:
+      labels:
+        app: medicrea-app
+      annotations:
+        metrics.dynatrace.com/scrape: 'true'
+        metrics.dynatrace.com/path: '/metrics'
+        metrics.dynatrace.com/port: '3030'
+        metrics.dynatrace.com/secure: 'false'
+    spec:
+      serviceAccountName: medicrea-comms-secrets-sa
+      containers:
+        - name: medicrea-app
+          image: $ARTIFACTORY_HOSTNAME$IMAGE_SOURCE_PATH:$IMAGE_SOURCE_TAG
+          envFrom:
+            - configMapRef:
+                name: common-env
+          env:
+            - name: SERVICES
+              value: medicrea-app
+            - name: CONTRAST__SERVER__NAME
+              value: medicrea-app-$CONTRAST_ENV
+            - name: CONTRAST__SERVER__ENVIRONMENT
+              value: $CONTRAST_ENV
+            - name: APP_URL
+              valueFrom:
+                secretKeyRef:
+                  name: app-env
+                  key: APP_URL
+            - name: TWILIO_LAB_MANAGER
+              valueFrom:
+                secretKeyRef:
+                  name: twilio-env
+                  key: TWILIO_LAB_MANAGER
+            - name: TWILIO_LAB_TEAM_NUMBER
+              valueFrom:
+                secretKeyRef:
+                  name: twilio-env
+                  key: TWILIO_LAB_TEAM_NUMBER
+            - name: TWILIO_ACCOUNT_SID
+              valueFrom:
+                secretKeyRef:
+                  name: twilio-env
+                  key: TWILIO_ACCOUNT_SID
+            - name: TWILIO_AUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: twilio-env
+                  key: TWILIO_AUTH_TOKEN
+            - name: TWILIO_API_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: twilio-env
+                  key: TWILIO_API_SECRET
+            - name: TWILIO_API_KEY_SID
+              valueFrom:
+                secretKeyRef:
+                  name: twilio-env
+                  key: TWILIO_API_KEY_SID
+            - name: TWILIO_CONVERSATIONS_SERVICE_SID
+              valueFrom:
+                secretKeyRef:
+                  name: twilio-env
+                  key: TWILIO_CONVERSATIONS_SERVICE_SID
+            - name: TWILIO_NOTIFY_SERVICE_SID
+              valueFrom:
+                secretKeyRef:
+                  name: twilio-env
+                  key: TWILIO_NOTIFY_SERVICE_SID
+            - name: TWILIO_PUSH_CREDENTIAL_SID
+              valueFrom:
+                secretKeyRef:
+                  name: twilio-env
+                  key: TWILIO_PUSH_CREDENTIAL_SID
+            - name: SF_LOGIN_URL
+              valueFrom:
+                secretKeyRef:
+                  name: salesforce-env
+                  key: SF_LOGIN_URL
+            - name: CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: salesforce-env
+                  key: CLIENT_ID
+            - name: SF_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: salesforce-env
+                  key: SF_USERNAME
+            - name: SF_CUSTOM_NOTIFICATION_ID
+              valueFrom:
+                secretKeyRef:
+                  name: salesforce-env
+                  key: SF_CUSTOM_NOTIFICATION_ID
+            - name: SF_WEBHOOK_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: salesforce-env
+                  key: SF_WEBHOOK_API_KEY
+            - name: CONTRAST__API__URL
+              valueFrom:
+                secretKeyRef:
+                  name: contrast-env
+                  key: CONTRAST_API_URL
+            - name: CONTRAST__API__API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: contrast-env
+                  key: CONTRAST_API_API_KEY
+            - name: CONTRAST__API__SERVICE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: contrast-env
+                  key: CONTRAST_API_SERVICE_KEY
+            - name: CONTRAST__API__USER_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: contrast-env
+                  key: CONTRAST_API_USER_NAME
+          ports:
+            - containerPort: 3030
+              name: "metrics"          
+          volumeMounts:
+            - name: salesforce-key
+              mountPath: "/run/secrets/salesforce"
+              readOnly: true
+            - name: azure-jwks-public-json
+              mountPath: "/run/secrets/azure"
+              readOnly: true
+            - name: ssl-cert
+              mountPath: "/run/secrets/cert"
+              readOnly: true
+            - name: ssl-cert-key
+              mountPath: "/run/secrets/certkey"
+              readOnly: true
+            - name: app-env
+              mountPath: "/run/secrets/app-env"
+              readOnly: true
+            - name: twilio-env
+              mountPath: "/run/secrets/twilio-env"
+              readOnly: true
+            - name: salesforce-env
+              mountPath: "/run/secrets/salesforce-env"
+              readOnly: true
+            - name: contrast-env
+              mountPath: "/run/secrets/contrast-env"
+              readOnly: true
+          livenessProbe:
+            httpGet:
+              path: /live
+              port: 3001
+            initialDelaySeconds: 60
+            periodSeconds: 5
+            timeoutSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 3001
+            initialDelaySeconds: 60
+            periodSeconds: 5
+            timeoutSeconds: 10
+      volumes:
+        - name: salesforce-key
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: "comms-moleculer-aws-secrets"
+        - name: azure-jwks-public-json
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: "comms-moleculer-aws-secrets"
+        - name: app-env
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: "comms-moleculer-aws-secrets"
+        - name: twilio-env
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: "comms-moleculer-aws-secrets"
+        - name: salesforce-env
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: "comms-moleculer-aws-secrets"
+        - name: contrast-env
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: "comms-moleculer-aws-secrets"
+        - name: ssl-cert
+          secret:
+            secretName: ssl-cert
+        - name: ssl-cert-key
+          secret:
+            secretName: ssl-cert-key
+
+---
+#########################################################
+# SFDC Users service
+#########################################################
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sfdc-users
+spec:
+  selector:
+    matchLabels:
+      app: sfdc-users
+  replicas: 2
+  template:
+    metadata:
+      labels:
+        app: sfdc-users
+      annotations:
+        metrics.dynatrace.com/scrape: 'true'
+        metrics.dynatrace.com/path: '/metrics'
+        metrics.dynatrace.com/port: '3030'
+        metrics.dynatrace.com/secure: 'false'
+    spec:
+      serviceAccountName: medicrea-comms-secrets-sa
+      containers:
+        - name: sfdc-users
+          image: $ARTIFACTORY_HOSTNAME$IMAGE_SOURCE_PATH:$IMAGE_SOURCE_TAG
+          envFrom:
+            - configMapRef:
+                name: common-env
+          env:
+            - name: SERVICES
+              value: sfdc-users
+            - name: CONTRAST__SERVER__NAME
+              value: sfdc-users-$CONTRAST_ENV
+            - name: CONTRAST__SERVER__ENVIRONMENT
+              value: $CONTRAST_ENV
+            - name: APP_URL
+              valueFrom:
+                secretKeyRef:
+                  name: app-env
+                  key: APP_URL
+            - name: TWILIO_LAB_MANAGER
+              valueFrom:
+                secretKeyRef:
+                  name: twilio-env
+                  key: TWILIO_LAB_MANAGER
+            - name: TWILIO_LAB_TEAM_NUMBER
+              valueFrom:
+                secretKeyRef:
+                  name: twilio-env
+                  key: TWILIO_LAB_TEAM_NUMBER
+            - name: TWILIO_ACCOUNT_SID
+              valueFrom:
+                secretKeyRef:
+                  name: twilio-env
+                  key: TWILIO_ACCOUNT_SID
+            - name: TWILIO_AUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: twilio-env
+                  key: TWILIO_AUTH_TOKEN
+            - name: TWILIO_API_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: twilio-env
+                  key: TWILIO_API_SECRET
+            - name: TWILIO_API_KEY_SID
+              valueFrom:
+                secretKeyRef:
+                  name: twilio-env
+                  key: TWILIO_API_KEY_SID
+            - name: TWILIO_CONVERSATIONS_SERVICE_SID
+              valueFrom:
+                secretKeyRef:
+                  name: twilio-env
+                  key: TWILIO_CONVERSATIONS_SERVICE_SID
+            - name: TWILIO_NOTIFY_SERVICE_SID
+              valueFrom:
+                secretKeyRef:
+                  name: twilio-env
+                  key: TWILIO_NOTIFY_SERVICE_SID
+            - name: TWILIO_PUSH_CREDENTIAL_SID
+              valueFrom:
+                secretKeyRef:
+                  name: twilio-env
+                  key: TWILIO_PUSH_CREDENTIAL_SID
+            - name: SF_LOGIN_URL
+              valueFrom:
+                secretKeyRef:
+                  name: salesforce-env
+                  key: SF_LOGIN_URL
+            - name: CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: salesforce-env
+                  key: CLIENT_ID
+            - name: SF_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: salesforce-env
+                  key: SF_USERNAME
+            - name: SF_CUSTOM_NOTIFICATION_ID
+              valueFrom:
+                secretKeyRef:
+                  name: salesforce-env
+                  key: SF_CUSTOM_NOTIFICATION_ID
+            - name: SF_WEBHOOK_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: salesforce-env
+                  key: SF_WEBHOOK_API_KEY
+            - name: CONTRAST__API__URL
+              valueFrom:
+                secretKeyRef:
+                  name: contrast-env
+                  key: CONTRAST_API_URL
+            - name: CONTRAST__API__API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: contrast-env
+                  key: CONTRAST_API_API_KEY
+            - name: CONTRAST__API__SERVICE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: contrast-env
+                  key: CONTRAST_API_SERVICE_KEY
+            - name: CONTRAST__API__USER_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: contrast-env
+                  key: CONTRAST_API_USER_NAME
+          ports:
+            - containerPort: 3030
+              name: "metrics"            
+          volumeMounts:
+            - name: salesforce-key
+              mountPath: "/run/secrets/salesforce"
+              readOnly: true
+            - name: azure-jwks-public-json
+              mountPath: "/run/secrets/azure"
+              readOnly: true
+            - name: ssl-cert
+              mountPath: "/run/secrets/cert"
+              readOnly: true
+            - name: ssl-cert-key
+              mountPath: "/run/secrets/certkey"
+              readOnly: true
+            - name: app-env
+              mountPath: "/run/secrets/app-env"
+              readOnly: true
+            - name: twilio-env
+              mountPath: "/run/secrets/twilio-env"
+              readOnly: true
+            - name: salesforce-env
+              mountPath: "/run/secrets/salesforce-env"
+              readOnly: true
+            - name: contrast-env
+              mountPath: "/run/secrets/contrast-env"
+              readOnly: true
+          livenessProbe:
+            httpGet:
+              path: /live
+              port: 3001
+            initialDelaySeconds: 60
+            periodSeconds: 5
+            timeoutSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 3001
+            initialDelaySeconds: 60
+            periodSeconds: 5
+            timeoutSeconds: 10
+      volumes:
+        - name: salesforce-key
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: "comms-moleculer-aws-secrets"
+        - name: azure-jwks-public-json
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: "comms-moleculer-aws-secrets"
+        - name: app-env
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: "comms-moleculer-aws-secrets"
+        - name: twilio-env
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: "comms-moleculer-aws-secrets"
+        - name: salesforce-env
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: "comms-moleculer-aws-secrets"
+        - name: contrast-env
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: "comms-moleculer-aws-secrets"
+        - name: ssl-cert
+          secret:
+            secretName: ssl-cert
+        - name: ssl-cert-key
+          secret:
+            secretName: ssl-cert-key
+---
+#########################################################
+# SFDC Query service
+#########################################################
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sfdc-query
+spec:
+  selector:
+    matchLabels:
+      app: sfdc-query
+  replicas: 2
+  template:
+    metadata:
+      labels:
+        app: sfdc-query
+      annotations:
+        metrics.dynatrace.com/scrape: 'true'
+        metrics.dynatrace.com/path: '/metrics'
+        metrics.dynatrace.com/port: '3030'
+        metrics.dynatrace.com/secure: 'false'
+    spec:
+      serviceAccountName: medicrea-comms-secrets-sa
+      containers:
+        - name: sfdc-query
+          image: $ARTIFACTORY_HOSTNAME$IMAGE_SOURCE_PATH:$IMAGE_SOURCE_TAG
+          envFrom:
+            - configMapRef:
+                name: common-env
+          env:
+            - name: SERVICES
+              value: sfdc-query
+            - name: CONTRAST__SERVER__NAME
+              value: sfdc-query-$CONTRAST_ENV
+            - name: CONTRAST__SERVER__ENVIRONMENT
+              value: $CONTRAST_ENV
+            - name: APP_URL
+              valueFrom:
+                secretKeyRef:
+                  name: app-env
+                  key: APP_URL
+            - name: TWILIO_LAB_MANAGER
+              valueFrom:
+                secretKeyRef:
+                  name: twilio-env
+                  key: TWILIO_LAB_MANAGER
+            - name: TWILIO_LAB_TEAM_NUMBER
+              valueFrom:
+                secretKeyRef:
+                  name: twilio-env
+                  key: TWILIO_LAB_TEAM_NUMBER
+            - name: TWILIO_ACCOUNT_SID
+              valueFrom:
+                secretKeyRef:
+                  name: twilio-env
+                  key: TWILIO_ACCOUNT_SID
+            - name: TWILIO_AUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: twilio-env
+                  key: TWILIO_AUTH_TOKEN
+            - name: TWILIO_API_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: twilio-env
+                  key: TWILIO_API_SECRET
+            - name: TWILIO_API_KEY_SID
+              valueFrom:
+                secretKeyRef:
+                  name: twilio-env
+                  key: TWILIO_API_KEY_SID
+            - name: TWILIO_CONVERSATIONS_SERVICE_SID
+              valueFrom:
+                secretKeyRef:
+                  name: twilio-env
+                  key: TWILIO_CONVERSATIONS_SERVICE_SID
+            - name: TWILIO_NOTIFY_SERVICE_SID
+              valueFrom:
+                secretKeyRef:
+                  name: twilio-env
+                  key: TWILIO_NOTIFY_SERVICE_SID
+            - name: TWILIO_PUSH_CREDENTIAL_SID
+              valueFrom:
+                secretKeyRef:
+                  name: twilio-env
+                  key: TWILIO_PUSH_CREDENTIAL_SID
+            - name: SF_LOGIN_URL
+              valueFrom:
+                secretKeyRef:
+                  name: salesforce-env
+                  key: SF_LOGIN_URL
+            - name: CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: salesforce-env
+                  key: CLIENT_ID
+            - name: SF_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: salesforce-env
+                  key: SF_USERNAME
+            - name: SF_CUSTOM_NOTIFICATION_ID
+              valueFrom:
+                secretKeyRef:
+                  name: salesforce-env
+                  key: SF_CUSTOM_NOTIFICATION_ID
+            - name: SF_WEBHOOK_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: salesforce-env
+                  key: SF_WEBHOOK_API_KEY
+            - name: CONTRAST__API__URL
+              valueFrom:
+                secretKeyRef:
+                  name: contrast-env
+                  key: CONTRAST_API_URL
+            - name: CONTRAST__API__API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: contrast-env
+                  key: CONTRAST_API_API_KEY
+            - name: CONTRAST__API__SERVICE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: contrast-env
+                  key: CONTRAST_API_SERVICE_KEY
+            - name: CONTRAST__API__USER_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: contrast-env
+                  key: CONTRAST_API_USER_NAME
+          ports:
+            - containerPort: 3030
+              name: "metrics"            
+          volumeMounts:
+            - name: salesforce-key
+              mountPath: "/run/secrets/salesforce"
+              readOnly: true
+            - name: azure-jwks-public-json
+              mountPath: "/run/secrets/azure"
+              readOnly: true
+            - name: ssl-cert
+              mountPath: "/run/secrets/cert"
+              readOnly: true
+            - name: ssl-cert-key
+              mountPath: "/run/secrets/certkey"
+              readOnly: true
+            - name: app-env
+              mountPath: "/run/secrets/app-env"
+              readOnly: true
+            - name: twilio-env
+              mountPath: "/run/secrets/twilio-env"
+              readOnly: true
+            - name: salesforce-env
+              mountPath: "/run/secrets/salesforce-env"
+              readOnly: true
+            - name: contrast-env
+              mountPath: "/run/secrets/contrast-env"
+              readOnly: true
+          livenessProbe:
+            httpGet:
+              path: /live
+              port: 3001
+            initialDelaySeconds: 60
+            periodSeconds: 5
+            timeoutSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 3001
+            initialDelaySeconds: 60
+            periodSeconds: 5
+            timeoutSeconds: 10
+      volumes:
+        - name: salesforce-key
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: "comms-moleculer-aws-secrets"
+        - name: azure-jwks-public-json
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: "comms-moleculer-aws-secrets"
+        - name: app-env
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: "comms-moleculer-aws-secrets"
+        - name: twilio-env
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: "comms-moleculer-aws-secrets"
+        - name: salesforce-env
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: "comms-moleculer-aws-secrets"
+        - name: contrast-env
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: "comms-moleculer-aws-secrets"
+        - name: ssl-cert
+          secret:
+            secretName: ssl-cert
+        - name: ssl-cert-key
+          secret:
+            secretName: ssl-cert-key
+---
+#########################################################
+# SFDC Tasks service
+#########################################################
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sfdc-tasks
+spec:
+  selector:
+    matchLabels:
+      app: sfdc-tasks
+  replicas: 2
+  template:
+    metadata:
+      labels:
+        app: sfdc-tasks
+      annotations:
+        metrics.dynatrace.com/scrape: 'true'
+        metrics.dynatrace.com/path: '/metrics'
+        metrics.dynatrace.com/port: '3030'
+        metrics.dynatrace.com/secure: 'false'
+    spec:
+      serviceAccountName: medicrea-comms-secrets-sa
+      containers:
+        - name: sfdc-tasks
+          image: $ARTIFACTORY_HOSTNAME$IMAGE_SOURCE_PATH:$IMAGE_SOURCE_TAG
+          envFrom:
+            - configMapRef:
+                name: common-env
+          env:
+            - name: SERVICES
+              value: sfdc-tasks
+            - name: CONTRAST__SERVER__NAME
+              value: sfdc-tasks-$CONTRAST_ENV
+            - name: CONTRAST__SERVER__ENVIRONMENT
+              value: $CONTRAST_ENV
+            - name: APP_URL
+              valueFrom:
+                secretKeyRef:
+                  name: app-env
+                  key: APP_URL
+            - name: TWILIO_LAB_MANAGER
+              valueFrom:
+                secretKeyRef:
+                  name: twilio-env
+                  key: TWILIO_LAB_MANAGER
+            - name: TWILIO_LAB_TEAM_NUMBER
+              valueFrom:
+                secretKeyRef:
+                  name: twilio-env
+                  key: TWILIO_LAB_TEAM_NUMBER
+            - name: TWILIO_ACCOUNT_SID
+              valueFrom:
+                secretKeyRef:
+                  name: twilio-env
+                  key: TWILIO_ACCOUNT_SID
+            - name: TWILIO_AUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: twilio-env
+                  key: TWILIO_AUTH_TOKEN
+            - name: TWILIO_API_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: twilio-env
+                  key: TWILIO_API_SECRET
+            - name: TWILIO_API_KEY_SID
+              valueFrom:
+                secretKeyRef:
+                  name: twilio-env
+                  key: TWILIO_API_KEY_SID
+            - name: TWILIO_CONVERSATIONS_SERVICE_SID
+              valueFrom:
+                secretKeyRef:
+                  name: twilio-env
+                  key: TWILIO_CONVERSATIONS_SERVICE_SID
+            - name: TWILIO_NOTIFY_SERVICE_SID
+              valueFrom:
+                secretKeyRef:
+                  name: twilio-env
+                  key: TWILIO_NOTIFY_SERVICE_SID
+            - name: TWILIO_PUSH_CREDENTIAL_SID
+              valueFrom:
+                secretKeyRef:
+                  name: twilio-env
+                  key: TWILIO_PUSH_CREDENTIAL_SID
+            - name: SF_LOGIN_URL
+              valueFrom:
+                secretKeyRef:
+                  name: salesforce-env
+                  key: SF_LOGIN_URL
+            - name: CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: salesforce-env
+                  key: CLIENT_ID
+            - name: SF_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: salesforce-env
+                  key: SF_USERNAME
+            - name: SF_CUSTOM_NOTIFICATION_ID
+              valueFrom:
+                secretKeyRef:
+                  name: salesforce-env
+                  key: SF_CUSTOM_NOTIFICATION_ID
+            - name: SF_WEBHOOK_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: salesforce-env
+                  key: SF_WEBHOOK_API_KEY
+            - name: CONTRAST__API__URL
+              valueFrom:
+                secretKeyRef:
+                  name: contrast-env
+                  key: CONTRAST_API_URL
+            - name: CONTRAST__API__API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: contrast-env
+                  key: CONTRAST_API_API_KEY
+            - name: CONTRAST__API__SERVICE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: contrast-env
+                  key: CONTRAST_API_SERVICE_KEY
+            - name: CONTRAST__API__USER_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: contrast-env
+                  key: CONTRAST_API_USER_NAME
+          ports:
+            - containerPort: 3030
+              name: "metrics"            
+          volumeMounts:
+            - name: salesforce-key
+              mountPath: "/run/secrets/salesforce"
+              readOnly: true
+            - name: azure-jwks-public-json
+              mountPath: "/run/secrets/azure"
+              readOnly: true
+            - name: ssl-cert
+              mountPath: "/run/secrets/cert"
+              readOnly: true
+            - name: ssl-cert-key
+              mountPath: "/run/secrets/certkey"
+              readOnly: true
+            - name: app-env
+              mountPath: "/run/secrets/app-env"
+              readOnly: true
+            - name: twilio-env
+              mountPath: "/run/secrets/twilio-env"
+              readOnly: true
+            - name: salesforce-env
+              mountPath: "/run/secrets/salesforce-env"
+              readOnly: true
+            - name: contrast-env
+              mountPath: "/run/secrets/contrast-env"
+              readOnly: true
+          livenessProbe:
+            httpGet:
+              path: /live
+              port: 3001
+            initialDelaySeconds: 60
+            periodSeconds: 5
+            timeoutSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 3001
+            initialDelaySeconds: 60
+            periodSeconds: 5
+            timeoutSeconds: 10
+      volumes:
+        - name: salesforce-key
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: "comms-moleculer-aws-secrets"
+        - name: azure-jwks-public-json
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: "comms-moleculer-aws-secrets"
+        - name: app-env
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: "comms-moleculer-aws-secrets"
+        - name: twilio-env
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: "comms-moleculer-aws-secrets"
+        - name: salesforce-env
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: "comms-moleculer-aws-secrets"
+        - name: contrast-env
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: "comms-moleculer-aws-secrets"
+        - name: ssl-cert
+          secret:
+            secretName: ssl-cert
+        - name: ssl-cert-key
+          secret:
+            secretName: ssl-cert-key
+---
+#########################################################
+# SFDC Notification service
+#########################################################
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sfdc-notification
+spec:
+  selector:
+    matchLabels:
+      app: sfdc-notification
+  replicas: 2
+  template:
+    metadata:
+      labels:
+        app: sfdc-notification
+      annotations:
+        metrics.dynatrace.com/scrape: 'true'
+        metrics.dynatrace.com/path: '/metrics'
+        metrics.dynatrace.com/port: '3030'
+        metrics.dynatrace.com/secure: 'false'
+    spec:
+      serviceAccountName: medicrea-comms-secrets-sa
+      containers:
+        - name: sfdc-notification
+          image: $ARTIFACTORY_HOSTNAME$IMAGE_SOURCE_PATH:$IMAGE_SOURCE_TAG
+          envFrom:
+            - configMapRef:
+                name: common-env
+          env:
+            - name: SERVICES
+              value: sfdc-notification
+            - name: CONTRAST__SERVER__NAME
+              value: sfdc-notification-$CONTRAST_ENV
+            - name: CONTRAST__SERVER__ENVIRONMENT
+              value: $CONTRAST_ENV
+            - name: APP_URL
+              valueFrom:
+                secretKeyRef:
+                  name: app-env
+                  key: APP_URL
+            - name: TWILIO_LAB_MANAGER
+              valueFrom:
+                secretKeyRef:
+                  name: twilio-env
+                  key: TWILIO_LAB_MANAGER
+            - name: TWILIO_LAB_TEAM_NUMBER
+              valueFrom:
+                secretKeyRef:
+                  name: twilio-env
+                  key: TWILIO_LAB_TEAM_NUMBER
+            - name: TWILIO_ACCOUNT_SID
+              valueFrom:
+                secretKeyRef:
+                  name: twilio-env
+                  key: TWILIO_ACCOUNT_SID
+            - name: TWILIO_AUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: twilio-env
+                  key: TWILIO_AUTH_TOKEN
+            - name: TWILIO_API_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: twilio-env
+                  key: TWILIO_API_SECRET
+            - name: TWILIO_API_KEY_SID
+              valueFrom:
+                secretKeyRef:
+                  name: twilio-env
+                  key: TWILIO_API_KEY_SID
+            - name: TWILIO_CONVERSATIONS_SERVICE_SID
+              valueFrom:
+                secretKeyRef:
+                  name: twilio-env
+                  key: TWILIO_CONVERSATIONS_SERVICE_SID
+            - name: TWILIO_NOTIFY_SERVICE_SID
+              valueFrom:
+                secretKeyRef:
+                  name: twilio-env
+                  key: TWILIO_NOTIFY_SERVICE_SID
+            - name: TWILIO_PUSH_CREDENTIAL_SID
+              valueFrom:
+                secretKeyRef:
+                  name: twilio-env
+                  key: TWILIO_PUSH_CREDENTIAL_SID
+            - name: SF_LOGIN_URL
+              valueFrom:
+                secretKeyRef:
+                  name: salesforce-env
+                  key: SF_LOGIN_URL
+            - name: CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: salesforce-env
+                  key: CLIENT_ID
+            - name: SF_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: salesforce-env
+                  key: SF_USERNAME
+            - name: SF_CUSTOM_NOTIFICATION_ID
+              valueFrom:
+                secretKeyRef:
+                  name: salesforce-env
+                  key: SF_CUSTOM_NOTIFICATION_ID
+            - name: SF_WEBHOOK_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: salesforce-env
+                  key: SF_WEBHOOK_API_KEY
+            - name: CONTRAST__API__URL
+              valueFrom:
+                secretKeyRef:
+                  name: contrast-env
+                  key: CONTRAST_API_URL
+            - name: CONTRAST__API__API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: contrast-env
+                  key: CONTRAST_API_API_KEY
+            - name: CONTRAST__API__SERVICE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: contrast-env
+                  key: CONTRAST_API_SERVICE_KEY
+            - name: CONTRAST__API__USER_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: contrast-env
+                  key: CONTRAST_API_USER_NAME
+          ports:
+            - containerPort: 3030
+              name: "metrics"            
+          volumeMounts:
+            - name: salesforce-key
+              mountPath: "/run/secrets/salesforce"
+              readOnly: true
+            - name: azure-jwks-public-json
+              mountPath: "/run/secrets/azure"
+              readOnly: true
+            - name: ssl-cert
+              mountPath: "/run/secrets/cert"
+              readOnly: true
+            - name: ssl-cert-key
+              mountPath: "/run/secrets/certkey"
+              readOnly: true
+            - name: app-env
+              mountPath: "/run/secrets/app-env"
+              readOnly: true
+            - name: twilio-env
+              mountPath: "/run/secrets/twilio-env"
+              readOnly: true
+            - name: salesforce-env
+              mountPath: "/run/secrets/salesforce-env"
+              readOnly: true
+            - name: contrast-env
+              mountPath: "/run/secrets/contrast-env"
+              readOnly: true
+          livenessProbe:
+            httpGet:
+              path: /live
+              port: 3001
+            initialDelaySeconds: 60
+            periodSeconds: 5
+            timeoutSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 3001
+            initialDelaySeconds: 60
+            periodSeconds: 5
+            timeoutSeconds: 10
+      volumes:
+        - name: salesforce-key
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: "comms-moleculer-aws-secrets"
+        - name: azure-jwks-public-json
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: "comms-moleculer-aws-secrets"
+        - name: app-env
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: "comms-moleculer-aws-secrets"
+        - name: twilio-env
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: "comms-moleculer-aws-secrets"
+        - name: salesforce-env
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: "comms-moleculer-aws-secrets"
+        - name: contrast-env
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: "comms-moleculer-aws-secrets"
+        - name: ssl-cert
+          secret:
+            secretName: ssl-cert
+        - name: ssl-cert-key
+          secret:
+            secretName: ssl-cert-key
+---
+#########################################################
+# Voicemail service
+#########################################################
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: voicemail
+spec:
+  selector:
+    matchLabels:
+      app: voicemail
+  replicas: 2
+  template:
+    metadata:
+      labels:
+        app: voicemail
+      annotations:
+        metrics.dynatrace.com/scrape: 'true'
+        metrics.dynatrace.com/path: '/metrics'
+        metrics.dynatrace.com/port: '3030'
+        metrics.dynatrace.com/secure: 'false'
+    spec:
+      serviceAccountName: medicrea-comms-secrets-sa
+      containers:
+        - name: voicemail
+          image: $ARTIFACTORY_HOSTNAME$IMAGE_SOURCE_PATH:$IMAGE_SOURCE_TAG
+          envFrom:
+            - configMapRef:
+                name: common-env
+          env:
+            - name: SERVICES
+              value: voicemail
+            - name: CONTRAST__SERVER__NAME
+              value: voicemail-$CONTRAST_ENV
+            - name: CONTRAST__SERVER__ENVIRONMENT
+              value: $CONTRAST_ENV
+            - name: APP_URL
+              valueFrom:
+                secretKeyRef:
+                  name: app-env
+                  key: APP_URL
+            - name: TWILIO_LAB_MANAGER
+              valueFrom:
+                secretKeyRef:
+                  name: twilio-env
+                  key: TWILIO_LAB_MANAGER
+            - name: TWILIO_LAB_TEAM_NUMBER
+              valueFrom:
+                secretKeyRef:
+                  name: twilio-env
+                  key: TWILIO_LAB_TEAM_NUMBER
+            - name: TWILIO_ACCOUNT_SID
+              valueFrom:
+                secretKeyRef:
+                  name: twilio-env
+                  key: TWILIO_ACCOUNT_SID
+            - name: TWILIO_AUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: twilio-env
+                  key: TWILIO_AUTH_TOKEN
+            - name: TWILIO_API_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: twilio-env
+                  key: TWILIO_API_SECRET
+            - name: TWILIO_API_KEY_SID
+              valueFrom:
+                secretKeyRef:
+                  name: twilio-env
+                  key: TWILIO_API_KEY_SID
+            - name: TWILIO_CONVERSATIONS_SERVICE_SID
+              valueFrom:
+                secretKeyRef:
+                  name: twilio-env
+                  key: TWILIO_CONVERSATIONS_SERVICE_SID
+            - name: TWILIO_NOTIFY_SERVICE_SID
+              valueFrom:
+                secretKeyRef:
+                  name: twilio-env
+                  key: TWILIO_NOTIFY_SERVICE_SID
+            - name: TWILIO_PUSH_CREDENTIAL_SID
+              valueFrom:
+                secretKeyRef:
+                  name: twilio-env
+                  key: TWILIO_PUSH_CREDENTIAL_SID
+            - name: SF_LOGIN_URL
+              valueFrom:
+                secretKeyRef:
+                  name: salesforce-env
+                  key: SF_LOGIN_URL
+            - name: CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: salesforce-env
+                  key: CLIENT_ID
+            - name: SF_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: salesforce-env
+                  key: SF_USERNAME
+            - name: SF_CUSTOM_NOTIFICATION_ID
+              valueFrom:
+                secretKeyRef:
+                  name: salesforce-env
+                  key: SF_CUSTOM_NOTIFICATION_ID
+            - name: SF_WEBHOOK_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: salesforce-env
+                  key: SF_WEBHOOK_API_KEY
+            - name: CONTRAST__API__URL
+              valueFrom:
+                secretKeyRef:
+                  name: contrast-env
+                  key: CONTRAST_API_URL
+            - name: CONTRAST__API__API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: contrast-env
+                  key: CONTRAST_API_API_KEY
+            - name: CONTRAST__API__SERVICE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: contrast-env
+                  key: CONTRAST_API_SERVICE_KEY
+            - name: CONTRAST__API__USER_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: contrast-env
+                  key: CONTRAST_API_USER_NAME
+          ports:
+            - containerPort: 3030
+              name: "metrics"            
+          volumeMounts:
+            - name: salesforce-key
+              mountPath: "/run/secrets/salesforce"
+              readOnly: true
+            - name: azure-jwks-public-json
+              mountPath: "/run/secrets/azure"
+              readOnly: true
+            - name: ssl-cert
+              mountPath: "/run/secrets/cert"
+              readOnly: true
+            - name: ssl-cert-key
+              mountPath: "/run/secrets/certkey"
+              readOnly: true
+            - name: app-env
+              mountPath: "/run/secrets/app-env"
+              readOnly: true
+            - name: twilio-env
+              mountPath: "/run/secrets/twilio-env"
+              readOnly: true
+            - name: salesforce-env
+              mountPath: "/run/secrets/salesforce-env"
+              readOnly: true
+            - name: contrast-env
+              mountPath: "/run/secrets/contrast-env"
+              readOnly: true
+          livenessProbe:
+            httpGet:
+              path: /live
+              port: 3001
+            initialDelaySeconds: 60
+            periodSeconds: 5
+            timeoutSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 3001
+            initialDelaySeconds: 60
+            periodSeconds: 5
+            timeoutSeconds: 10
+      volumes:
+        - name: salesforce-key
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: "comms-moleculer-aws-secrets"
+        - name: azure-jwks-public-json
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: "comms-moleculer-aws-secrets"
+        - name: app-env
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: "comms-moleculer-aws-secrets"
+        - name: twilio-env
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: "comms-moleculer-aws-secrets"
+        - name: salesforce-env
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: "comms-moleculer-aws-secrets"
+        - name: contrast-env
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: "comms-moleculer-aws-secrets"
+        - name: ssl-cert
+          secret:
+            secretName: ssl-cert
+        - name: ssl-cert-key
+          secret:
+            secretName: ssl-cert-key
+---
+#########################################################
+# Notify service
+#########################################################
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: notify
+spec:
+  selector:
+    matchLabels:
+      app: notify
+  replicas: 2
+  template:
+    metadata:
+      labels:
+        app: notify
+      annotations:
+        metrics.dynatrace.com/scrape: 'true'
+        metrics.dynatrace.com/path: '/metrics'
+        metrics.dynatrace.com/port: '3030'
+        metrics.dynatrace.com/secure: 'false'
+    spec:
+      serviceAccountName: medicrea-comms-secrets-sa
+      containers:
+        - name: notify
+          image: $ARTIFACTORY_HOSTNAME$IMAGE_SOURCE_PATH:$IMAGE_SOURCE_TAG
+          envFrom:
+            - configMapRef:
+                name: common-env
+          env:
+            - name: SERVICES
+              value: notify
+            - name: CONTRAST__SERVER__NAME
+              value: notify-$CONTRAST_ENV
+            - name: CONTRAST__SERVER__ENVIRONMENT
+              value: $CONTRAST_ENV
+            - name: APP_URL
+              valueFrom:
+                secretKeyRef:
+                  name: app-env
+                  key: APP_URL
+            - name: TWILIO_LAB_MANAGER
+              valueFrom:
+                secretKeyRef:
+                  name: twilio-env
+                  key: TWILIO_LAB_MANAGER
+            - name: TWILIO_LAB_TEAM_NUMBER
+              valueFrom:
+                secretKeyRef:
+                  name: twilio-env
+                  key: TWILIO_LAB_TEAM_NUMBER
+            - name: TWILIO_ACCOUNT_SID
+              valueFrom:
+                secretKeyRef:
+                  name: twilio-env
+                  key: TWILIO_ACCOUNT_SID
+            - name: TWILIO_AUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: twilio-env
+                  key: TWILIO_AUTH_TOKEN
+            - name: TWILIO_API_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: twilio-env
+                  key: TWILIO_API_SECRET
+            - name: TWILIO_API_KEY_SID
+              valueFrom:
+                secretKeyRef:
+                  name: twilio-env
+                  key: TWILIO_API_KEY_SID
+            - name: TWILIO_CONVERSATIONS_SERVICE_SID
+              valueFrom:
+                secretKeyRef:
+                  name: twilio-env
+                  key: TWILIO_CONVERSATIONS_SERVICE_SID
+            - name: TWILIO_NOTIFY_SERVICE_SID
+              valueFrom:
+                secretKeyRef:
+                  name: twilio-env
+                  key: TWILIO_NOTIFY_SERVICE_SID
+            - name: TWILIO_PUSH_CREDENTIAL_SID
+              valueFrom:
+                secretKeyRef:
+                  name: twilio-env
+                  key: TWILIO_PUSH_CREDENTIAL_SID
+            - name: SF_LOGIN_URL
+              valueFrom:
+                secretKeyRef:
+                  name: salesforce-env
+                  key: SF_LOGIN_URL
+            - name: CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: salesforce-env
+                  key: CLIENT_ID
+            - name: SF_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: salesforce-env
+                  key: SF_USERNAME
+            - name: SF_CUSTOM_NOTIFICATION_ID
+              valueFrom:
+                secretKeyRef:
+                  name: salesforce-env
+                  key: SF_CUSTOM_NOTIFICATION_ID
+            - name: SF_WEBHOOK_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: salesforce-env
+                  key: SF_WEBHOOK_API_KEY
+            - name: CONTRAST__API__URL
+              valueFrom:
+                secretKeyRef:
+                  name: contrast-env
+                  key: CONTRAST_API_URL
+            - name: CONTRAST__API__API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: contrast-env
+                  key: CONTRAST_API_API_KEY
+            - name: CONTRAST__API__SERVICE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: contrast-env
+                  key: CONTRAST_API_SERVICE_KEY
+            - name: CONTRAST__API__USER_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: contrast-env
+                  key: CONTRAST_API_USER_NAME
+          ports:
+            - containerPort: 3030
+              name: "metrics"            
+          volumeMounts:
+            - name: salesforce-key
+              mountPath: "/run/secrets/salesforce"
+              readOnly: true
+            - name: azure-jwks-public-json
+              mountPath: "/run/secrets/azure"
+              readOnly: true
+            - name: ssl-cert
+              mountPath: "/run/secrets/cert"
+              readOnly: true
+            - name: ssl-cert-key
+              mountPath: "/run/secrets/certkey"
+              readOnly: true
+            - name: app-env
+              mountPath: "/run/secrets/app-env"
+              readOnly: true
+            - name: twilio-env
+              mountPath: "/run/secrets/twilio-env"
+              readOnly: true
+            - name: salesforce-env
+              mountPath: "/run/secrets/salesforce-env"
+              readOnly: true
+            - name: contrast-env
+              mountPath: "/run/secrets/contrast-env"
+              readOnly: true
+          livenessProbe:
+            httpGet:
+              path: /live
+              port: 3001
+            initialDelaySeconds: 60
+            periodSeconds: 5
+            timeoutSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 3001
+            initialDelaySeconds: 60
+            periodSeconds: 5
+            timeoutSeconds: 10
+      volumes:
+        - name: salesforce-key
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: "comms-moleculer-aws-secrets"
+        - name: azure-jwks-public-json
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: "comms-moleculer-aws-secrets"
+        - name: app-env
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: "comms-moleculer-aws-secrets"
+        - name: twilio-env
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: "comms-moleculer-aws-secrets"
+        - name: salesforce-env
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: "comms-moleculer-aws-secrets"
+        - name: contrast-env
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: "comms-moleculer-aws-secrets"
+        - name: ssl-cert
+          secret:
+            secretName: ssl-cert
+        - name: ssl-cert-key
+          secret:
+            secretName: ssl-cert-key
+---
+#########################################################
+# SFDC Webhooks service
+#########################################################
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sfdc-webhooks
+spec:
+  selector:
+    matchLabels:
+      app: sfdc-webhooks
+  replicas: 2
+  template:
+    metadata:
+      labels:
+        app: sfdc-webhooks
+      annotations:
+        metrics.dynatrace.com/scrape: 'true'
+        metrics.dynatrace.com/path: '/metrics'
+        metrics.dynatrace.com/port: '3030'
+        metrics.dynatrace.com/secure: 'false'
+    spec:
+      serviceAccountName: medicrea-comms-secrets-sa
+      containers:
+        - name: sfdc-webhooks
+          image: $ARTIFACTORY_HOSTNAME$IMAGE_SOURCE_PATH:$IMAGE_SOURCE_TAG
+          envFrom:
+            - configMapRef:
+                name: common-env
+          env:
+            - name: SERVICES
+              value: sfdc-webhooks
+            - name: CONTRAST__SERVER__NAME
+              value: sfdc-webhooks-$CONTRAST_ENV
+            - name: CONTRAST__SERVER__ENVIRONMENT
+              value: $CONTRAST_ENV
+            - name: APP_URL
+              valueFrom:
+                secretKeyRef:
+                  name: app-env
+                  key: APP_URL
+            - name: TWILIO_LAB_MANAGER
+              valueFrom:
+                secretKeyRef:
+                  name: twilio-env
+                  key: TWILIO_LAB_MANAGER
+            - name: TWILIO_LAB_TEAM_NUMBER
+              valueFrom:
+                secretKeyRef:
+                  name: twilio-env
+                  key: TWILIO_LAB_TEAM_NUMBER
+            - name: TWILIO_ACCOUNT_SID
+              valueFrom:
+                secretKeyRef:
+                  name: twilio-env
+                  key: TWILIO_ACCOUNT_SID
+            - name: TWILIO_AUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: twilio-env
+                  key: TWILIO_AUTH_TOKEN
+            - name: TWILIO_API_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: twilio-env
+                  key: TWILIO_API_SECRET
+            - name: TWILIO_API_KEY_SID
+              valueFrom:
+                secretKeyRef:
+                  name: twilio-env
+                  key: TWILIO_API_KEY_SID
+            - name: TWILIO_CONVERSATIONS_SERVICE_SID
+              valueFrom:
+                secretKeyRef:
+                  name: twilio-env
+                  key: TWILIO_CONVERSATIONS_SERVICE_SID
+            - name: TWILIO_NOTIFY_SERVICE_SID
+              valueFrom:
+                secretKeyRef:
+                  name: twilio-env
+                  key: TWILIO_NOTIFY_SERVICE_SID
+            - name: TWILIO_PUSH_CREDENTIAL_SID
+              valueFrom:
+                secretKeyRef:
+                  name: twilio-env
+                  key: TWILIO_PUSH_CREDENTIAL_SID
+            - name: SF_LOGIN_URL
+              valueFrom:
+                secretKeyRef:
+                  name: salesforce-env
+                  key: SF_LOGIN_URL
+            - name: CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: salesforce-env
+                  key: CLIENT_ID
+            - name: SF_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: salesforce-env
+                  key: SF_USERNAME
+            - name: SF_CUSTOM_NOTIFICATION_ID
+              valueFrom:
+                secretKeyRef:
+                  name: salesforce-env
+                  key: SF_CUSTOM_NOTIFICATION_ID
+            - name: SF_WEBHOOK_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: salesforce-env
+                  key: SF_WEBHOOK_API_KEY
+            - name: CONTRAST__API__URL
+              valueFrom:
+                secretKeyRef:
+                  name: contrast-env
+                  key: CONTRAST_API_URL
+            - name: CONTRAST__API__API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: contrast-env
+                  key: CONTRAST_API_API_KEY
+            - name: CONTRAST__API__SERVICE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: contrast-env
+                  key: CONTRAST_API_SERVICE_KEY
+            - name: CONTRAST__API__USER_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: contrast-env
+                  key: CONTRAST_API_USER_NAME
+          ports:
+            - containerPort: 3030
+              name: "metrics"            
+          volumeMounts:
+            - name: salesforce-key
+              mountPath: "/run/secrets/salesforce"
+              readOnly: true
+            - name: azure-jwks-public-json
+              mountPath: "/run/secrets/azure"
+              readOnly: true
+            - name: ssl-cert
+              mountPath: "/run/secrets/cert"
+              readOnly: true
+            - name: ssl-cert-key
+              mountPath: "/run/secrets/certkey"
+              readOnly: true
+            - name: app-env
+              mountPath: "/run/secrets/app-env"
+              readOnly: true
+            - name: twilio-env
+              mountPath: "/run/secrets/twilio-env"
+              readOnly: true
+            - name: salesforce-env
+              mountPath: "/run/secrets/salesforce-env"
+              readOnly: true
+            - name: contrast-env
+              mountPath: "/run/secrets/contrast-env"
+              readOnly: true
+          livenessProbe:
+            httpGet:
+              path: /live
+              port: 3001
+            initialDelaySeconds: 60
+            periodSeconds: 5
+            timeoutSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 3001
+            initialDelaySeconds: 60
+            periodSeconds: 5
+            timeoutSeconds: 10
+      volumes:
+        - name: salesforce-key
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: "comms-moleculer-aws-secrets"
+        - name: azure-jwks-public-json
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: "comms-moleculer-aws-secrets"
+        - name: app-env
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: "comms-moleculer-aws-secrets"
+        - name: twilio-env
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: "comms-moleculer-aws-secrets"
+        - name: salesforce-env
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: "comms-moleculer-aws-secrets"
+        - name: contrast-env
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: "comms-moleculer-aws-secrets"
+        - name: ssl-cert
+          secret:
+            secretName: ssl-cert
+        - name: ssl-cert-key
+          secret:
+            secretName: ssl-cert-key
+---
+

@@ -1,0 +1,28 @@
+#########################################################
+# SFDC Webhooks service
+#########################################################
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sfdc-webhooks
+spec:
+  selector:
+    matchLabels:
+      app: sfdc-webhooks
+  replicas: 2
+  template:
+    metadata:
+      labels:
+        app: sfdc-webhooks
+    spec:
+      containers:
+        - name: sfdc-webhooks
+          image: medicrea-comms-backend
+          envFrom:
+            - configMapRef:
+                name: common-env
+          env:
+            - name: SERVICES
+              value: sfdc-webhooks
+---
+

@@ -1,0 +1,28 @@
+#########################################################
+# Voice service
+#########################################################
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: voice
+spec:
+  selector:
+    matchLabels:
+      app: voice
+  replicas: 2
+  template:
+    metadata:
+      labels:
+        app: voice
+    spec:
+      containers:
+        - name: voice
+          image: medicrea-comms-backend
+          envFrom:
+            - configMapRef:
+                name: common-env
+          env:
+            - name: SERVICES
+              value: voice
+---
+
