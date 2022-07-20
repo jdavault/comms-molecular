@@ -87,9 +87,6 @@ tilt_modules
 # Ignore yarn lock (favoring npm for this repo)
 yarn.lock
 
-# Key for signing with SF OAuth JWT token flow 
-salesforce.key
-salesforce.*.key
 
 # Public signing keys for our specific Azure Tenant and Application
 azure-jwks-public.json

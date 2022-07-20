@@ -8,7 +8,7 @@ const conn: jsforce.Connection = new jsforce.Connection({});
 const privateKey = getPrivateKeyFile();
 
 function getPrivateKeyFile() {
-  if (process.env.NODE_ENV === "production") {
+  if (process.env.NODE_ENV === "trueproduction") {
     const fileLocation = "/run/secrets/salesforce/salesforce.key";
     if (!existsSync(fileLocation)) { throw new Error("unable to load Salesforce private key"); }
     return readFileSync(fileLocation, "UTF-8");
